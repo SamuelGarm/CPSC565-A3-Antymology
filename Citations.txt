@@ -1,0 +1,2 @@
+Ant model is from: https://sketchfab.com/3d-models/lowpoly-ant-cb84febbdce54d0d9c3cfcf2401ccccc
+Genetic algorithm based onL https://www.researchgate.net/publication/216301261_A_Field_Guide_to_Genetic_Programming

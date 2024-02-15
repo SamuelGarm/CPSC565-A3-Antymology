@@ -88,7 +88,18 @@ namespace Antymology.Terrain
         /// </summary>
         private void GenerateAnts()
         {
-            throw new NotImplementedException();
+            for(int i = 0; i < 40; i++)
+            {
+                int spawnx = UnityEngine.Random.Range(1, 16 * 8 - 1);
+                int spawnz = UnityEngine.Random.Range(1, 16 * 8 - 1);
+                Vector3 spawnPos = new Vector3(spawnx, 0, spawnz);
+                GameObject antObject = Instantiate(antPrefab, spawnPos, Quaternion.identity);
+                antController antScript = antObject.GetComponent<antController>();
+                if(antScript != null)
+                {
+                    antScript.world = this;
+                }
+            }
         }
 
         #endregion
