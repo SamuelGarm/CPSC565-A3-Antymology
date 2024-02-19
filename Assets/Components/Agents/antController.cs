@@ -7,6 +7,7 @@ public class antController : MonoBehaviour
     
     public WorldManager world;
 
+    byte[] values;
     int maxHealth = 100;
     int currentHealth = 0;
     int healthDec = -1;
@@ -27,7 +28,7 @@ public class antController : MonoBehaviour
     void Update()
     {
         int y = 0;
-        while(!(world.GetBlock(blockPos.x, y, blockPos.z) is AirBlock))
+        while (world.GetBlock(blockPos.x, y, blockPos.z) is not AirBlock)
         {
             y++;
         }
