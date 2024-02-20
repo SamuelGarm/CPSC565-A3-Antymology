@@ -5,6 +5,7 @@ using UnityEngine;
 using System.Reflection;
 using System.Linq;
 using UnityEditor.Build.Reporting;
+using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
 
 /*
  * Abstract classes for general node implementaiton interfaces
@@ -159,7 +160,7 @@ public class OR_node : Function_node
             RStatement += "| " + line + Environment.NewLine;
         }
 
-        return LStatement + " && " + RStatement;
+        return LStatement + " || " + RStatement;
     }
 
     public override byte Evaluate(List<byte> parameters)
@@ -167,7 +168,7 @@ public class OR_node : Function_node
         byte mask = 0b00000001;
         byte val1 = (byte)(parameters[0] & mask);
         byte val2 = (byte)(parameters[1] & mask);
-        return (byte)(val1 & val2);
+        return (byte)(val1 | val2);
     }
 }
 
@@ -195,6 +196,7 @@ public class ASTEvaluator
     {
         public List<byte> childrenValues; //the value that each child has returned
         public ASTNode node; //the node that this frame is assosiated with
+        public int currentChild;
     }
     //store results of calls in a stack. This is used to evaluate nodes with multiple childnode values needed
     private Stack<Node_frame> FrameStack = new Stack<Node_frame>();
@@ -204,17 +206,97 @@ public class ASTEvaluator
         Node_frame frame = new Node_frame();
         frame.childrenValues = new List<byte>();
         frame.node = initial;
+        frame.currentChild = 0;
         FrameStack.Push(frame);
     }
 
     //iterate through the tree evaluating as much as possible until a action_node is reached and the node is returned
+    //null is returned if the first node is reached without any action nodes to prevent infinite loop
     public Action_node getNextAction()
     {
+        if(FrameStack.Count == 0) return null; //check to make sure there is at least one stack frame
         //the top frame of the stack is the current node
         Node_frame currentFrame = FrameStack.Peek();
-        if(currentFrame.node.GetType().IsSubclassOf(typeof(Terminal_node)))
+        if (currentFrame.node is SequenceNode)
         {
-
+            SequenceNode node = (SequenceNode)currentFrame.node;
+            if(currentFrame.currentChild <= node.Children.Count - 1)
+            {
+                Node_frame childFrame = new Node_frame();
+                childFrame.node = node.Children[currentFrame.currentChild];
+                childFrame.currentChild = 0;
+                childFrame.childrenValues = new List<byte>();
+                FrameStack.Push(childFrame);
+                currentFrame.currentChild++;
+            }
+            else
+            {
+                //if there are no more children to iterate through then remove this frame to go up to the parent
+                FrameStack.Pop();
+            }
+        }
+        else if (currentFrame.node is IfElseNode)
+        {
+            IfElseNode node = (IfElseNode)currentFrame.node;
+            if(currentFrame.currentChild == 0)
+            {
+                Node_frame childFrame = new Node_frame();
+                childFrame.node = node.Children[0];
+                childFrame.currentChild = 0;
+                childFrame.childrenValues = new List<byte>();
+                FrameStack.Push(childFrame);
+                currentFrame.currentChild++;
+            } 
+            else if(currentFrame.currentChild == 1) 
+            {
+                Node_frame childFrame = new Node_frame();
+                //branch
+                if ((currentFrame.childrenValues[0] & 0b00000001) == 0b00000001)
+                {
+                    childFrame.node = node.Children[1];
+                }
+                else
+                {
+                    childFrame.node = node.Children[2];
+                }
+                childFrame.currentChild = 0;
+                childFrame.childrenValues = new List<byte>();
+                FrameStack.Push(childFrame);
+                currentFrame.currentChild++;
+            }
+            else
+            {
+                FrameStack.Pop();
+            }
+        }
+        else if (currentFrame.node.GetType().IsSubclassOf(typeof(Function_node)))
+        {
+            Function_node node = (Function_node)currentFrame.node;
+            if (currentFrame.currentChild <= node.Children.Count - 1)
+            {
+                Node_frame childFrame = new Node_frame();
+                childFrame.node = node.Children[currentFrame.currentChild];
+                childFrame.currentChild = 0;
+                childFrame.childrenValues = new List<byte>();
+                FrameStack.Push(childFrame);
+                currentFrame.currentChild++;
+            } 
+            else
+            {
+                //evaluate, set ehe next node and pop itself
+                byte result = node.Evaluate(currentFrame.childrenValues);
+                FrameStack.Pop();
+                FrameStack.Peek().childrenValues.Add(result);
+            }
+        }
+        else if (currentFrame.node.GetType().IsSubclassOf(typeof(Terminal_node)))
+        {
+            Terminal_node node = (Terminal_node)currentFrame.node;
+            //evaluate, set ehe next node and pop itself
+            byte result = node.GetValue();
+            FrameStack.Pop();
+            FrameStack.Peek().childrenValues.Add(result);
+            
         }
         return null;
     }

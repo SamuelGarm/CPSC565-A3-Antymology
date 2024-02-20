@@ -350,6 +350,7 @@ GameObject:
   - component: {fileID: 964896558}
   - component: {fileID: 964896557}
   - component: {fileID: 964896559}
+  - component: {fileID: 964896560}
   m_Layer: 0
   m_Name: WorldManager
   m_TagString: Untagged
@@ -408,6 +409,18 @@ MonoBehaviour:
   Acidic_Region_Radius: 5
   Number_Of_Conatiner_Spheres: 5
   Conatiner_Sphere_Radius: 10
+--- !u!114 &964896560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 964896556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 307c0d2799b30614494c07fc4520b6b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!850595691 &1768496494
 LightingSettings:
   m_ObjectHideFlags: 0
