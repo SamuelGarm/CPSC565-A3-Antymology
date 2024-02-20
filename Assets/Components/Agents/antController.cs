@@ -12,7 +12,7 @@ public class antController : MonoBehaviour
     int currentHealth = 0;
     int healthDec = -1;
 
-    public Vector3Int blockPos = Vector3Int.zero;
+    private Vector3Int blockPos = Vector3Int.zero;
 
     enum antType { WORKER, QUEEN }
     antType type;
