@@ -12,12 +12,12 @@ using UnityEditor;
 
 public enum ValueType
 {
-    NONE,
-    //WILD,
-    BOOL,
-    HBYTE,
-    BYTE
+    NONE =  0b00000001,
+    BOOL =  0b00000010,
+    HBYTE = 0b00000100,
+    BYTE =  0b00001000
 }
+
 
 //return type interfaces. 
 public interface IReturnable 
@@ -27,72 +27,17 @@ public interface IReturnable
 public interface IBoolReturn : IReturnable { }
 public interface IByteReturn : IReturnable { }
 public interface IHByteReturn : IReturnable { }
-public interface INoneReturn : IReturnable { }
-public interface IConstant { }
+
+//this interface is used if the node is an action to be executed
+public interface IAction { }
 
 
 // Base class for AST nodes
 public abstract class AST_node
 {
-    public List<AST_node> Children  = new List<AST_node>();
-
     //prevent this class being made outside this file
     //the constructor will automatically create children to ensure valid state
-    internal AST_node() 
-    {
-        generateChildren(0);
-    }
-
-    internal AST_node(int treeDepth)
-    {
-        generateChildren(treeDepth);
-    }
-
-    void generateChildren(int remainingDepth)
-    {
-        List<ValueType> childrenReturnTypes = getChildrenTypes();
-        var types = Assembly.GetExecutingAssembly().GetTypes();
-        foreach (ValueType type in childrenReturnTypes)
-        {
-            IEnumerable<Type> implementingTypes = null;
-            if (remainingDepth <= 0)
-            {
-                //fill with constant nodes
-                if (type == ValueType.BOOL)
-                    implementingTypes = new List<Type>() { typeof(Constant_bool) };
-                else if(type == ValueType.HBYTE)
-                    implementingTypes = new List<Type>() { typeof(Constant_hbyte) };
-                else if (type == ValueType.BYTE)
-                    implementingTypes = new List<Type>() { typeof(Constant_byte) };
-                else if(type == ValueType.NONE)
-                    implementingTypes = new List<Type>() { typeof(SequenceNode) };
-            }
-            else
-            {
-                if (type == ValueType.NONE)
-                    implementingTypes = types.Where(t => !typeof(IReturnable).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(AST_node)));
-                else if (type == ValueType.BOOL)
-                    implementingTypes = types.Where(t => typeof(IBoolReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(AST_node)));
-                else if (type == ValueType.BYTE)
-                    implementingTypes = types.Where(t => typeof(IByteReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(AST_node)));
-                else if (type == ValueType.HBYTE)
-                    implementingTypes = types.Where(t => typeof(IHByteReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(AST_node)));
-                //else if (type == ValueType.WILD)
-                //    implementingTypes = types.Where(t => typeof(IReturnable).IsAssignableFrom(t) && t.IsClass && t.IsSubclassOf(typeof(AST_node)));
-                //check to ensure we found a node
-                if (implementingTypes == null || implementingTypes.Count() == 0)
-                    throw new Exception("CRITICAL ERROR: Tried to find AST_node with " + type.ToString() + " return but none were found");
-            }
-            Type node = implementingTypes.ElementAt(UnityEngine.Random.Range(0, implementingTypes.Count()));
-            if(typeof(IConstant).IsAssignableFrom(node))
-                Children.Add((AST_node)Activator.CreateInstance(node));
-            else
-                Children.Add((AST_node)Activator.CreateInstance(node, remainingDepth-1));
-        }
-    }
-
-    //this function is called during construction to initialize default children. It can return an empty list
-    protected abstract List<ValueType> getChildrenTypes();
+    internal AST_node() {}
 
     //return a string that describes the subtree starting at this node
     public abstract string GetSubtreeString();
@@ -102,26 +47,71 @@ public abstract class AST_node
     {
         string[] lines = input.Split(Environment.NewLine);
         string output = "";
-        for(int i = 0; i < lines.Length - 1; i++)
+        for(int i = 0; i < lines.Length; i++)
             output += "| " + lines[i] + Environment.NewLine;
-        return output;
+        return output.Trim(Environment.NewLine.ToCharArray());
     }
 }
 
-//If something is a action it affects the agent and will cause the iterator to yeild return
-public abstract class Action_node : AST_node {}
+//internal nodes have children
+public abstract class Internal_node : AST_node
+{
+    public Internal_node()
+    {
+        generateChildren();
+    }
+
+    public List<AST_node> Children = new List<AST_node>();
+
+    void generateChildren()
+    {
+        List<ValueType> childrenReturnTypes = getChildrenTypes();
+        Type[] types = Assembly.GetExecutingAssembly().GetTypes();
+        foreach (ValueType type in childrenReturnTypes)
+        {
+            List<Type> implementingTypes = new List<Type>();
+
+            if ((type & ValueType.NONE) > 0)
+                implementingTypes.AddRange(types.Where(t => !typeof(IReturnable).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(Leaf_node))));
+            if ((type & ValueType.BOOL) > 0)
+                implementingTypes.AddRange(types.Where(t => typeof(IBoolReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(Leaf_node))));
+            if ((type & ValueType.BYTE) > 0)
+                implementingTypes.AddRange(types.Where(t => typeof(IByteReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(Leaf_node))));
+            if ((type & ValueType.HBYTE) > 0)
+                implementingTypes.AddRange(types.Where(t => typeof(IHByteReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass && t.IsSubclassOf(typeof(Leaf_node))));
+
+            //check to ensure we found a node
+            if (implementingTypes.Count() == 0)
+                throw new Exception("CRITICAL ERROR: Tried to find AST_node with " + type + " return but none were found");
+            //}
+            Type node = implementingTypes.ElementAt(UnityEngine.Random.Range(0, implementingTypes.Count()));
+            //if (typeof(Internal_node).IsAssignableFrom(node))
+                Children.Add((AST_node)Activator.CreateInstance(node));
+            //else
+                //Children.Add((AST_node)Activator.CreateInstance(node, remainingDepth - 1));
+        }
+    }
+
+    //this function is called during construction to initialize default children. It can return an empty list
+    protected abstract List<ValueType> getChildrenTypes();
+}
+
+public abstract class Leaf_node : AST_node
+{
+}
+
 
 /*
  * Constant nodes
  */
-sealed class Constant_bool : AST_node, IBoolReturn, IConstant
+sealed class Constant_bool : Leaf_node, IBoolReturn
 {
     private readonly byte Value;
     public Constant_bool(byte value) { this.Value = value; }
 
     public Constant_bool()
     {
-        this.Value = (byte)UnityEngine.Random.Range(0,2);
+        this.Value = (byte)UnityEngine.Random.Range(0, 2);
     }
 
     public byte Evaluate(List<byte> parameters)
@@ -133,14 +123,9 @@ sealed class Constant_bool : AST_node, IBoolReturn, IConstant
     {
         return Value == 0 ? "FALSE" : "TRUE";
     }
-
-    protected override List<ValueType> getChildrenTypes()
-    {
-        return new List<ValueType>();
-    }
 }
 
-sealed class Constant_byte : AST_node, IByteReturn, IConstant
+sealed class Constant_byte : Leaf_node, IByteReturn
 {
     private readonly byte Value;
     public Constant_byte(byte value) { this.Value = value; }
@@ -155,18 +140,13 @@ sealed class Constant_byte : AST_node, IByteReturn, IConstant
         return Value;
     }
 
-    protected override List<ValueType> getChildrenTypes()
-    {
-        return new List<ValueType>();
-    }
-
     public override string GetSubtreeString()
     {
         return Value.ToString();
     }
 }
 
-sealed class Constant_hbyte : AST_node, IHByteReturn, IConstant
+sealed class Constant_hbyte : Leaf_node, IHByteReturn
 {
     private readonly byte Value;
     public Constant_hbyte(byte value) { this.Value = value; }
@@ -181,27 +161,27 @@ sealed class Constant_hbyte : AST_node, IHByteReturn, IConstant
         return Value;
     }
 
-    protected override List<ValueType> getChildrenTypes()
-    {
-        return new List<ValueType>();
-    }
-
     public override string GetSubtreeString()
     {
         return Value.ToString();
     }
 }
 
+sealed class NOOP : Leaf_node, IAction
+{
+    public override string GetSubtreeString()
+    {
+        return "NOOP";
+    }
+}
 
 /*
  * Flow nodes
 */
 //Sequence node is the foundation of the code as it allows multiple statements of any type to be placed in succession
-sealed public class SequenceNode : AST_node
+sealed public class SequenceNode : Internal_node
 {
-    public SequenceNode(int treeDepth) : base(treeDepth) {}
-
-    public SequenceNode() : base(0) {}
+    public SequenceNode() {}
 
     //adds a new statement to the sequence
     public void AddStatement(AST_node statement)
@@ -221,24 +201,20 @@ sealed public class SequenceNode : AST_node
         {
             subtreeString += statement.GetSubtreeString() + Environment.NewLine;
         }
-        return "SEQ" + Environment.NewLine + AddScopeLine(subtreeString);
+        return "SEQ" + Environment.NewLine + AddScopeLine(subtreeString.Trim(Environment.NewLine.ToCharArray()));
     }
 }
 
 //if else nodes will evaluate a condition then branch accordingly. 
-sealed public class IfElseNode : AST_node
+sealed public class IfElseNode : Internal_node
 {
     public IfElseNode()
     {
     }
 
-    public IfElseNode(int treeDepth) : base(treeDepth)
-    {
-    }
-
     protected override List<ValueType> getChildrenTypes()
     {
-        return new List<ValueType>() { ValueType.BOOL, ValueType.NONE, ValueType.NONE };
+        return new List<ValueType>() { ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE, ValueType.NONE, ValueType.NONE };
     }
 
     public override string GetSubtreeString()
@@ -246,26 +222,24 @@ sealed public class IfElseNode : AST_node
         string conditionBody = Children[0].GetSubtreeString();
         string ifBody = Children[1].GetSubtreeString();
         string elseBody = Children[2].GetSubtreeString();
-        return "IF ( " + conditionBody + " )" + Environment.NewLine + AddScopeLine(ifBody) + "Else" + Environment.NewLine + AddScopeLine(elseBody);
+        return "IF ( " + conditionBody + " )" + Environment.NewLine + AddScopeLine(ifBody) + Environment.NewLine + "Else" + Environment.NewLine + AddScopeLine(elseBody);
     }
 }
 
 /*
  * Logical nodes
  */
-sealed public class AND_node : AST_node, IBoolReturn
+sealed public class AND_node : Internal_node, IBoolReturn
 {
     public AND_node()
     {
     }
 
-    public AND_node(int treeDepth) : base(treeDepth)
-    {
-    }
-
     protected override List<ValueType> getChildrenTypes()
     {
-        return new List<ValueType>() { ValueType.BOOL, ValueType.BOOL };
+        return new List<ValueType>() { 
+            ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE, 
+            ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE };
     }
 
     public override string GetSubtreeString()
@@ -285,20 +259,18 @@ sealed public class AND_node : AST_node, IBoolReturn
     }
 }
 
-sealed public class OR_node : AST_node, IBoolReturn
+sealed public class OR_node : Internal_node, IBoolReturn
 {
     public OR_node()
     {
     }
 
-    public OR_node(int treeDepth) : base(treeDepth)
-    {
-    }
-
     protected override List<ValueType> getChildrenTypes()
     {
-        return new List<ValueType>() { ValueType.BOOL, ValueType.BOOL };
-    }
+        return new List<ValueType>() {
+            ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE, 
+            ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE };
+}
 
     public override string GetSubtreeString()
     {
@@ -317,19 +289,16 @@ sealed public class OR_node : AST_node, IBoolReturn
     }
 }
 
-sealed public class NOT_node : AST_node, IBoolReturn
+sealed public class NOT_node : Internal_node, IBoolReturn
 {
     public NOT_node()
     {
     }
 
-    public NOT_node(int treeDepth) : base(treeDepth)
-    {
-    }
-
     protected override List<ValueType> getChildrenTypes()
     {
-        return new List<ValueType>() { ValueType.BOOL };
+        return new List<ValueType>() {
+            ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE };
     }
 
     public override string GetSubtreeString()
@@ -377,50 +346,49 @@ sealed public class NOT_node : AST_node, IBoolReturn
 //    }
 //}
 
-sealed public class BYTEEQUALS_node : AST_node, IBoolReturn
-{
-    public BYTEEQUALS_node()
-    {
-    }
+//sealed public class BYTEEQUALS_node : AST_node, IBoolReturn
+//{
+//    public BYTEEQUALS_node()
+//    {
+//    }
+//
+//    public BYTEEQUALS_node(int treeDepth) : base(treeDepth)
+//    {
+//    }
+//
+//    protected override List<ValueType> getChildrenTypes()
+//    {
+//        return new List<ValueType>() { ValueType.BYTE, ValueType.BYTE };
+//    }
+//
+//    public override string GetSubtreeString()
+//    {
+//        string LStatement = Children[0].GetSubtreeString();
+//        string RStatement = Children[1].GetSubtreeString();
+//
+//        return "(" + LStatement + " == " + RStatement + ")";
+//    }
+//
+//    public byte Evaluate(List<byte> parameters)
+//    {
+//        byte val1 = (byte)(parameters[0]);
+//        byte val2 = (byte)(parameters[1]);
+//        return val1 == val2 ? (byte)1 : (byte)0;
+//    }
+//}
 
-    public BYTEEQUALS_node(int treeDepth) : base(treeDepth)
-    {
-    }
-
-    protected override List<ValueType> getChildrenTypes()
-    {
-        return new List<ValueType>() { ValueType.BYTE, ValueType.BYTE };
-    }
-
-    public override string GetSubtreeString()
-    {
-        string LStatement = Children[0].GetSubtreeString();
-        string RStatement = Children[1].GetSubtreeString();
-
-        return "(" + LStatement + " == " + RStatement + ")";
-    }
-
-    public byte Evaluate(List<byte> parameters)
-    {
-        byte val1 = (byte)(parameters[0]);
-        byte val2 = (byte)(parameters[1]);
-        return val1 == val2 ? (byte)1 : (byte)0;
-    }
-}
-
-sealed public class GT_node : AST_node, IBoolReturn
+sealed public class GT_node : Internal_node, IBoolReturn
 {
     public GT_node()
     {
     }
 
-    public GT_node(int treeDepth) : base(treeDepth)
-    {
-    }
 
     protected override List<ValueType> getChildrenTypes()
     {
-        return new List<ValueType>() { ValueType.BYTE, ValueType.BYTE };
+        return new List<ValueType>() { 
+            ValueType.BYTE | ValueType.HBYTE, 
+            ValueType.BYTE | ValueType.HBYTE };
     }
 
     public override string GetSubtreeString()
@@ -448,10 +416,13 @@ public class AST : MonoBehaviour
     {
         UnityEngine.Random.InitState((int)DateTime.Now.Ticks);
 
-        root = new SequenceNode(4); //a squence node is ALWAYS the root
-        root.AddStatement(new IfElseNode(3));
-        root.AddStatement(new IfElseNode(3));
-        Debug.Log(root.GetSubtreeString());
+        for (int i = 0; i < 10; i++)
+        {
+            root = new SequenceNode(); //a squence node is ALWAYS the root
+            root.AddStatement(new IfElseNode());
+            root.AddStatement(new IfElseNode());
+            Debug.Log(root.GetSubtreeString());
+        }
         //collect all the non-abstract classes that derive from AST node in the program
         //node_pool = Assembly.GetExecutingAssembly().GetTypes().Where(t => !t.IsAbstract && t.IsSubclassOf(typeof(AST_node))).ToList();
         //tnode_pool = node_pool.Where(t => !t.IsAbstract && typeof(Terminal_node).IsAssignableFrom(t) && t != typeof(Terminal_node)).ToList();
@@ -512,8 +483,8 @@ public class ASTEvaluator
 
     //iterate through the tree evaluating as much as possible until a action_node is reached and the node is returned
     //null is returned if the first node is reached without any action nodes to prevent infinite loop
-    public Action_node getNextAction()
-    {
+    //public Action_node getNextAction()
+    //{
         //if(FrameStack.Count == 0) return null; //check to make sure there is at least one stack frame. If there isn't something is wrong
         ////the top frame of the stack is the current node
         //Node_frame currentFrame = FrameStack.Peek();
@@ -595,6 +566,6 @@ public class ASTEvaluator
         //    FrameStack.Peek().childrenValues.Add(result);
         //    
         //}
-        return null;
-    }
+        //return null;
+    //}
 }
