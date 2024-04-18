@@ -121,7 +121,8 @@ namespace Antymology.Terrain
             mesh.uv = uvs.ToArray();
 
             // Optimize, and normal calculation
-            MeshUtility.Optimize(mesh);
+            //MeshUtility.Optimize(mesh);
+            mesh.Optimize();
             mesh.RecalculateNormals();
             collider.sharedMesh = mesh;
         }
