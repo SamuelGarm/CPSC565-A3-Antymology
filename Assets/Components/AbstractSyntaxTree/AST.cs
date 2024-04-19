@@ -5,6 +5,8 @@ using System.Reflection;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using UnityEditor;
+using System.Collections;
+using UnityEditor.Experimental.GraphView;
 
 /*
  * Abstract classes for general node implementaiton interfaces
@@ -35,6 +37,7 @@ public interface IAction { }
 // Base class for AST nodes
 public abstract class AST_node
 {
+    public AST_node parent;
     //prevent this class being made outside this file
     //the constructor will automatically create children to ensure valid state
     internal AST_node() {}
@@ -84,16 +87,19 @@ public abstract class Internal_node : AST_node
             if (implementingTypes.Count() == 0)
                 throw new Exception("CRITICAL ERROR: Tried to find AST_node with " + type + " return but none were found");
             //}
-            Type node = implementingTypes.ElementAt(UnityEngine.Random.Range(0, implementingTypes.Count()));
+            Type nodeType = implementingTypes.ElementAt(UnityEngine.Random.Range(0, implementingTypes.Count()));
             //if (typeof(Internal_node).IsAssignableFrom(node))
-                Children.Add((AST_node)Activator.CreateInstance(node));
+            AST_node node = (AST_node)Activator.CreateInstance(nodeType);
+            Children.Add(node);
+            node.parent = this;
+
             //else
                 //Children.Add((AST_node)Activator.CreateInstance(node, remainingDepth - 1));
         }
     }
 
     //this function is called during construction to initialize default children. It can return an empty list
-    protected abstract List<ValueType> getChildrenTypes();
+    public abstract List<ValueType> getChildrenTypes();
 }
 
 public abstract class Leaf_node : AST_node
@@ -183,15 +189,12 @@ sealed public class SequenceNode : Internal_node
 {
     public SequenceNode() {}
 
-    //adds a new statement to the sequence
-    public void AddStatement(AST_node statement)
+    public override List<ValueType> getChildrenTypes()
     {
-        Children.Add(statement);
-    }
-
-    protected override List<ValueType> getChildrenTypes()
-    {
-        return new List<ValueType>();
+        List<ValueType> ret = new List<ValueType>();
+        for (int i = 0; i < Children.Count; i++)
+            ret.Add(ValueType.NONE);
+        return ret;
     }
 
     public override string GetSubtreeString()
@@ -212,7 +215,7 @@ sealed public class IfElseNode : Internal_node
     {
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE, ValueType.NONE, ValueType.NONE };
     }
@@ -235,7 +238,7 @@ sealed public class AND_node : Internal_node, IBoolReturn
     {
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { 
             ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE, 
@@ -265,7 +268,7 @@ sealed public class OR_node : Internal_node, IBoolReturn
     {
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() {
             ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE, 
@@ -295,7 +298,7 @@ sealed public class NOT_node : Internal_node, IBoolReturn
     {
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() {
             ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE };
@@ -384,7 +387,7 @@ sealed public class GT_node : Internal_node, IBoolReturn
     }
 
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { 
             ValueType.BYTE | ValueType.HBYTE, 
@@ -407,8 +410,7 @@ sealed public class GT_node : Internal_node, IBoolReturn
 
 public class AST : MonoBehaviour
 {
-    //type pools
-    public List<Type> node_pool;
+    List<AST_node> nodes = new List<AST_node>();
 
     private SequenceNode root;
 
@@ -416,46 +418,142 @@ public class AST : MonoBehaviour
     {
         UnityEngine.Random.InitState((int)DateTime.Now.Ticks);
 
-        for (int i = 0; i < 10; i++)
+        root = new SequenceNode(); //a squence node is ALWAYS the root
+        root.Children.Add(new SequenceNode());
+        root.Children[0].parent = root;
+        nodes.AddRange(root.Children); //note, root is excluded from this list since it must be treated special
+
+        for(int i = 0; i < 30; i++)
         {
-            root = new SequenceNode(); //a squence node is ALWAYS the root
-            root.AddStatement(new IfElseNode());
-            root.AddStatement(new IfElseNode());
             Debug.Log(root.GetSubtreeString());
-        }
-        //collect all the non-abstract classes that derive from AST node in the program
-        //node_pool = Assembly.GetExecutingAssembly().GetTypes().Where(t => !t.IsAbstract && t.IsSubclassOf(typeof(AST_node))).ToList();
-        //tnode_pool = node_pool.Where(t => !t.IsAbstract && typeof(Terminal_node).IsAssignableFrom(t) && t != typeof(Terminal_node)).ToList();
-        //inode_pool = node_pool.Where(t => !t.IsAbstract && typeof(Interior_node).IsAssignableFrom(t) && t != typeof(Interior_node)).ToList();
-        //Debug.Log("Found " + node_pool.Count + " Node types"); 
+            if (!Expand())
+                Debug.Log("Failed to expand");
+            //decide if we want to add or mutate
+            //if(UnityEngine.Random.Range(0,10) < 6)
+            //{
+            //    //add to a sequence
+            //
+            //} else
+            //{
+            //    //mutate
+            //}
+        } 
 
+        Debug.Log(root.GetSubtreeString());
+    } 
+
+    bool PointMutate()
+    {
+        //try to find a point that can be mutated with a valid return value and children types
+        return false;
     }
-    
-    //DEPTH is the longest chain of children under the root (distance from root node)
-    //Returns the depth of the subtree with 'root' at the root (just a root will have depth 0)
-    //This is a recursive function!
-    //int subtreeDepth(AST_node root) {
-    //    if(root == null) return 0; //just in case
-    //    if(root is Terminal_node)
-    //    {
-    //        return 0; //terminal nodes have a depth of 0 (no children)
-    //    } 
-    //    else if (root is Interior_node iNode)
-    //    {
-    //        int maxDepth = 0;
-    //        foreach(AST_node node in iNode.Children)
-    //        {
-    //            maxDepth = Math.Max(maxDepth, subtreeDepth(node));
-    //        }
-    //        return maxDepth + 1;
-    //    }
-    //    else
-    //    {
-    //        //FALL THROUGH CASE
-    //        return 0;
-    //    }
-    //}
 
+    bool Shrink()
+    {
+        //choose a random node and replace it with a leaf node
+        return false;
+    }
+
+    //expands leaf nodes into internal nodes
+    bool Expand()
+    {
+        //choose a leaf node (or a sequence) and add/replace it with a more complex node
+        List<AST_node> candidates = new List<AST_node>();
+        foreach (Leaf_node l in nodes.OfType<Leaf_node>().ToList())
+            candidates.Add(l);
+        foreach (SequenceNode l in nodes.OfType<SequenceNode>().ToList())
+            candidates.Add(l);
+        
+        while(candidates.Count > 0)
+        {
+            //find all possible replacements for a random candidate
+            AST_node candidate = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            Internal_node parent = (Internal_node)candidate.parent;
+            
+            //use the parent child parameters to determine what nodes are good
+            int indexInParent = parent.Children.IndexOf(candidate);
+            ValueType retType = parent.getChildrenTypes()[indexInParent];
+            List<Type> replacements = NodesWithReturnType(retType);
+
+            //filter replacements to only be internal nodes
+            for(int i = replacements.Count-1; i >= 0; i--)
+            {
+                if (!replacements[i].IsSubclassOf(typeof(Internal_node)))
+                    replacements.RemoveAt(i);
+            }
+
+            while (replacements.Count > 0)
+            {
+                int typeIndex = UnityEngine.Random.Range(0, replacements.Count);
+
+                Internal_node replacement = (Internal_node)Activator.CreateInstance(replacements[typeIndex]);
+                
+                //switch out the node
+                //sequence node is special since it gains a new child instead of being a leaf that needs to be switched
+                if(candidate is SequenceNode seq)
+                {
+                    nodes.Add(replacement);
+                    nodes.AddRange(replacement.Children);
+                    seq.Children.Add(replacement);
+                    replacement.parent = seq;
+                    return true;
+                } else
+                {
+                    //regular leaf nodes here
+                    //make sure it isn't the same type (seq can have the same type since it is nested not replaced)
+                    if (replacements[typeIndex] == candidate.GetType())
+                    {
+                        replacements.RemoveAt(typeIndex);
+                        continue;
+                    }
+                    nodes.Add(replacement);
+                    nodes.AddRange(replacement.Children);
+                    nodes.Remove(candidate);
+                    //switch out the node in the parent
+                    parent.Children[parent.Children.IndexOf(candidate)] = replacement;
+                    replacement.parent = parent;
+                    return true;
+                }
+            }
+            //if the above failed that means the candidate can't be replaced and move on to a different one
+            candidates.Remove(candidate);
+
+        }
+        return false;
+    }
+
+    ValueType NodeReturnValue(AST_node node)
+    {
+        ValueType val = 0;
+        if (typeof(IBoolReturn).IsAssignableFrom(node.GetType()))
+            val |= ValueType.BOOL;
+        if (typeof(IByteReturn).IsAssignableFrom(node.GetType()))
+            val |= ValueType.BYTE;
+        if (typeof(IHByteReturn).IsAssignableFrom(node.GetType()))
+            val |= ValueType.HBYTE;
+        //if no interfaces match then it returns nothing
+        if (val == 0)
+            val = ValueType.NONE;
+
+        return val;
+    }
+
+    //supports finding nodes with different return types by | the opertators (ie: BYTE | HBYYTE)
+    List<Type> NodesWithReturnType(ValueType returnType) {
+        //get all nodes with the specified return type(s)
+        Type[] types = Assembly.GetExecutingAssembly().GetTypes();
+        List<Type> implementingTypes = new List<Type>();
+
+        if ((returnType & ValueType.NONE) > 0)
+            implementingTypes.AddRange(types.Where(t => t.IsSubclassOf(typeof(AST_node)) && !typeof(IReturnable).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass));
+        if ((returnType & ValueType.BOOL) > 0)
+            implementingTypes.AddRange(types.Where(t => t.IsSubclassOf(typeof(AST_node)) && typeof(IBoolReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass));
+        if ((returnType & ValueType.BYTE) > 0)
+            implementingTypes.AddRange(types.Where(t => t.IsSubclassOf(typeof(AST_node)) && typeof(IByteReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass));
+        if ((returnType & ValueType.HBYTE) > 0)
+            implementingTypes.AddRange(types.Where(t => t.IsSubclassOf(typeof(AST_node)) && typeof(IHByteReturn).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass));
+        return implementingTypes;
+    }
 }
 
 

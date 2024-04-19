@@ -129,7 +129,7 @@ public class TransferEnergy : Internal_node, IAction, IAntNode
         return "TRANSFER ( " + Children[0].GetSubtreeString() + " ) ";
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { ValueType.BYTE };
     }
@@ -148,7 +148,7 @@ public class DepositPheromone : Internal_node, IAction, IAntNode
         return "DEPOSIT ( ID:" + Children[0].GetSubtreeString() + " VAL: " + Children[1].GetSubtreeString() + " )";
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { ValueType.HBYTE, ValueType.HBYTE };
     }
@@ -172,7 +172,7 @@ public class GetValue : Internal_node, IBoolReturn, IByteReturn, IHByteReturn, I
         return "GET_VALUE ( " + Children[0].GetSubtreeString() + " )";
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { ValueType.HBYTE };
     }
@@ -191,7 +191,7 @@ public class SetValue : Internal_node, IAction, IAntNode
         return "SET_VALUE ( ID:" + Children[0].GetSubtreeString() + " VAL: " + Children[1].GetSubtreeString() + " )";
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { ValueType.HBYTE, ValueType.BOOL | ValueType.HBYTE | ValueType.BYTE };
     }
@@ -218,7 +218,7 @@ public class SensePheromone : Internal_node, IByteReturn, IAntNode
         return "SENSE_PHEROMONE ( ID:" + Children[0].GetSubtreeString() + " POS:" + Children[1].GetSubtreeString() + " )";
     }
 
-    protected override List<ValueType> getChildrenTypes()
+    public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { ValueType.HBYTE, ValueType.HBYTE };
     }
