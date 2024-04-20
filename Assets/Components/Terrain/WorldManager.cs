@@ -2,6 +2,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace Antymology.Terrain
@@ -44,6 +46,23 @@ namespace Antymology.Terrain
         private AST workerAST;
         private AST queenAST;
 
+        /// <summary>
+        /// for performance reasons I elected to make pheromones a 2D array rather than a proper 3D one
+        /// </summary>
+        private byte[,,] pheromones;
+
+        /// <summary>
+        /// Stores references to ants by column
+        /// </summary>
+        private List<AntController>[,] antsAtLocation;
+
+        List<AntController> ants;
+
+        AntController currentlyProcessing = null;
+
+        public Material queenMaterial;
+        public GameObject queenMarker;
+
         #endregion
 
         #region Initialization
@@ -73,6 +92,21 @@ namespace Antymology.Terrain
                 ConfigurationManager.Instance.World_Height,
                 ConfigurationManager.Instance.World_Diameter];
 
+            pheromones = new byte[
+            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+            16];
+
+            antsAtLocation = new List<AntController>[
+            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
+            for (int i = 0; i < antsAtLocation.GetLength(0); i++)
+                for (int j = 0; j < antsAtLocation.GetLength(1); j++)
+                    antsAtLocation[i, j] = new List<AntController>();
+
+
+                    ants = new List<AntController>();
+
             workerAST = new AST();
             workerAST.RegisterUserNodeType(typeof(AntHealth));
             workerAST.RegisterUserNodeType(typeof(AntsHere));
@@ -88,6 +122,9 @@ namespace Antymology.Terrain
             workerAST.RegisterUserNodeType(typeof(SensePheromone));
             workerAST.RegisterUserNodeType(typeof(SenseBlockBelow));
             workerAST.RegisterUserNodeType(typeof(SenseBlockAhead));
+            //give it some starting nodes
+            for (int i = 0; i < 5; i++)
+                workerAST.ExpandMutate();
 
             queenAST = new AST();
             queenAST.RegisterUserNodeType(typeof(AntHealth));
@@ -105,6 +142,11 @@ namespace Antymology.Terrain
             queenAST.RegisterUserNodeType(typeof(SenseBlockBelow));
             queenAST.RegisterUserNodeType(typeof(SenseBlockAhead));
             queenAST.RegisterUserNodeType(typeof(CreateNest)); //Unique to queen
+            //give it some starting nodes
+            for (int i = 0; i < 5; i++)
+                queenAST.ExpandMutate();
+            Debug.Log("Worker Brain:" + Environment.NewLine + workerAST.root.GetSubtreeString());
+            Debug.Log("Queen Brain:" + Environment.NewLine + queenAST.root.GetSubtreeString());
         }
 
         /// <summary>
@@ -119,47 +161,156 @@ namespace Antymology.Terrain
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
 
             GenerateAnts();
+            FixAntPositions();
+            UpdateAntLocations();
         }
 
-        public AntController getCurrentProcessingAnt()
+        private float stepTime = 0;
+        public bool run = false;
+        public bool step = false;
+
+        private void Update()
         {
-            return null;
+            if (!run && !step)
+            {
+                stepTime = 0;
+                return;
+            }
+            stepTime += Time.deltaTime;
+            if (stepTime > 1 || step)//ConfigurationManager.Instance.minTimeDelta)
+            {
+                step = false;
+                stepTime = 0;
+                Step();
+            }
         }
 
-        public int CountAntsAtBlock(int x, int y, int z)
+        private void Step()
         {
-            return 0;
+            foreach (IAntNode node in queenAST.nodes.OfType<IAntNode>().ToArray())
+                node.setWorld(this);
+            foreach (IAntNode node in workerAST.nodes.OfType<IAntNode>().ToArray())
+                node.setWorld(this);
+            EvaporatePheromones();
+            UpdateAntLocations();
+            for(int i = ants.Count-1; i>= 0; i--)
+            {
+                AntController ant = ants[i];
+                currentlyProcessing = ant;
+                ant.Step();
+                if (ant.currentHealth <= 0)
+                {
+                    ants.Remove(ant);
+                    if (ant.type == AntController.antType.QUEEN)
+                        Destroy(queenMarker);
+                    Destroy(ant.gameObject);
+                }
+            }
+            FixAntPositions();
+        }
+
+        private void EvaporatePheromones()
+        {
+            for (int i = 0; i < pheromones.GetLength(0); i++)
+                for (int j = 0; j < pheromones.GetLength(1); j++)
+                    for(int z = 0; z < pheromones.GetLength(2); z++)
+                    pheromones[i, j, z] = (byte)Math.Max(pheromones[i, j, z] - 1, 0);
+        }
+
+        private void FixAntPositions()
+        {
+            foreach(AntController ant in ants)
+            {
+                int y = 0;
+                while (GetBlock(ant.blockPos.x, y, ant.blockPos.z) is not AirBlock)
+                {
+                    y++;
+                }
+                ant.blockPos.y = y;
+                ant.transform.position = ant.blockPos - new Vector3(0,0.5f,0);
+                if (ant.type == AntController.antType.QUEEN)
+                    queenMarker.transform.position = ant.transform.position;
+                //fix rotation
+                ant.transform.rotation = Quaternion.LookRotation(ant.heading);
+            }
+        }
+
+        private void UpdateAntLocations()
+        {
+            //clear lists 
+            for (int i = 0; i < antsAtLocation.GetLength(0); i++)
+                for (int j = 0; j < antsAtLocation.GetLength(1); j++)
+                    antsAtLocation[i, j].Clear();
+
+            foreach (AntController ant in ants)
+                antsAtLocation[ant.blockPos.x, ant.blockPos.z].Add(ant);
+        }
+
+        public AntController GetCurrentProcessingAnt()
+        {
+            return currentlyProcessing;
+        }
+
+        public int CountAntsAtBlock(int x, int z)
+        {
+            return antsAtLocation[x,z].Count;
         }
 
         public List<AntController> antsAtBlock(int x, int y, int z)
         {
-            return new List<AntController>();
+            return new List<AntController>(antsAtLocation[x, z]);
         }
 
-        public int pheromoneAtBlock(int x, int y, int z)
+        public int pheromoneAtBlock(int x, int z, byte type)
         {
-            return 0;
+            return pheromones[x,z,type];
+        }
+
+        public void addPheromone(int x, int z, byte type, byte amount)
+        {
+            pheromones[x, z, type] = (byte)Math.Min(pheromones[x, z, type] + amount, byte.MaxValue);
         }
 
         /// <summary>
         /// TO BE IMPLEMENTED BY YOU
         /// </summary>
+       
         private void GenerateAnts()
         {
             for(int i = 0; i < 40; i++)
             {
-                int spawnx = UnityEngine.Random.Range(1, 16 * 8 - 1);
-                int spawnz = UnityEngine.Random.Range(1, 16 * 8 - 1);
-                Vector3 spawnPos = new Vector3(spawnx, 0, spawnz);
+                //spawn them roughly in the middle of the map
+                int center = (ConfigurationManager.Instance.Chunk_Diameter * ConfigurationManager.Instance.World_Diameter) / 2;
+                int spawnx = center + UnityEngine.Random.Range(-8, 8);
+                int spawnz = center + UnityEngine.Random.Range(-8, 8);
+                Vector3Int spawnPos = new Vector3Int(spawnx, 0, spawnz);
                 GameObject antObject = Instantiate(antPrefab, spawnPos, Quaternion.identity);
                 AntController antScript = antObject.GetComponent<AntController>();
+                antScript.MoveToBlockCoord(spawnPos);
+                Vector3Int[] headings = { new Vector3Int(1, 0, 0), new Vector3Int(0, 0, 1), new Vector3Int(-1, 0, 0), new Vector3Int(0, 0, -1) };
+                antScript.heading = headings[UnityEngine.Random.Range(0, 4)];
                 if(antScript != null)
                 {
+                    ants.Add(antScript);
                     antScript.world = this;
                     if (i == 0)
+                    {
                         antScript.brain = queenAST;
+                        antScript.type = AntController.antType.QUEEN;
+                        MeshRenderer render = antObject.GetComponentsInChildren<MeshRenderer>()[0];
+                        Material[] materials = render.materials;
+                        materials[0] = queenMaterial;
+                        materials[1] = queenMaterial;
+                        materials[2] = queenMaterial;
+                        materials[3] = queenMaterial;
+                        render.materials = materials;
+                        queenMarker.transform.position = antObject.transform.position;
+                    }
                     else
+                    {
                         antScript.brain = workerAST;
+                        antScript.type = AntController.antType.WORKER;
+                    }
                 }
             }
         }
@@ -311,6 +462,7 @@ namespace Antymology.Terrain
         /// </summary>
         private void GeneratePreliminaryWorld()
         {
+
             for (int x = 0; x < Blocks.GetLength(0); x++)
                 for (int z = 0; z < Blocks.GetLength(2); z++)
                 {

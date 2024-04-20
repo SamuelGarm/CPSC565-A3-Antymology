@@ -5,13 +5,13 @@ using UnityEngine;
 
 interface IAntNode
 {
-    void setAnt(WorldManager controller);
+    void setWorld(WorldManager controller);
 }
 
 public class AntHealth : Leaf_node, IByteReturn, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -19,7 +19,7 @@ public class AntHealth : Leaf_node, IByteReturn, IAntNode
     public byte Evaluate(List<byte> parameters)
     {
         //Ensures that health above 255 doesn't get wrapped and instead is treated as 255
-        return (byte)Math.Min(controller.getCurrentProcessingAnt().currentHealth, byte.MaxValue);
+        return (byte)Math.Min(controller.GetCurrentProcessingAnt().currentHealth, byte.MaxValue);
     }
 
     public override string GetSubtreeString()
@@ -31,7 +31,7 @@ public class AntHealth : Leaf_node, IByteReturn, IAntNode
 public class AntsHere : Leaf_node, IByteReturn, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -43,15 +43,15 @@ public class AntsHere : Leaf_node, IByteReturn, IAntNode
 
     public byte Evaluate(List<byte> parameters)
     {
-        AntController ant = controller.getCurrentProcessingAnt();
-        return (byte)controller.CountAntsAtBlock(ant.blockPos.x, ant.blockPos.y, ant.blockPos.z);
+        AntController ant = controller.GetCurrentProcessingAnt();
+        return (byte)controller.CountAntsAtBlock(ant.blockPos.x, ant.blockPos.z);
     }
 }
 
 public class MoveForward : Leaf_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -65,7 +65,7 @@ public class MoveForward : Leaf_node, IAction, IAntNode
 public class TurnRight : Leaf_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -79,7 +79,7 @@ public class TurnRight : Leaf_node, IAction, IAntNode
 public class TurnLeft : Leaf_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -93,7 +93,7 @@ public class TurnLeft : Leaf_node, IAction, IAntNode
 public class Consume : Leaf_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -107,7 +107,7 @@ public class Consume : Leaf_node, IAction, IAntNode
 public class Dig : Leaf_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -121,7 +121,7 @@ public class Dig : Leaf_node, IAction, IAntNode
 public class TransferEnergy : Internal_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -140,7 +140,7 @@ public class TransferEnergy : Internal_node, IAction, IAntNode
 public class DepositPheromone : Internal_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -159,14 +159,14 @@ public class DepositPheromone : Internal_node, IAction, IAntNode
 public class GetValue : Internal_node, IBoolReturn, IByteReturn, IHByteReturn, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        AntController ant = controller.getCurrentProcessingAnt();
+        AntController ant = controller.GetCurrentProcessingAnt();
         return ant.values[parameters[0]];
     }
 
@@ -184,7 +184,7 @@ public class GetValue : Internal_node, IBoolReturn, IByteReturn, IHByteReturn, I
 public class SetValue : Internal_node, IAction, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
@@ -206,15 +206,15 @@ public class SetValue : Internal_node, IAction, IAntNode
 public class SensePheromone : Internal_node, IByteReturn, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        AntController ant = controller.getCurrentProcessingAnt();
-        return (byte)Math.Min(controller.pheromoneAtBlock(ant.blockPos.x, ant.blockPos.y, ant.blockPos.z), byte.MaxValue);
+        AntController ant = controller.GetCurrentProcessingAnt();
+        return (byte)Math.Min(controller.pheromoneAtBlock(ant.blockPos.x, ant.blockPos.z, parameters[0]), byte.MaxValue);
     }
 
     public override string GetSubtreeString()
@@ -231,14 +231,14 @@ public class SensePheromone : Internal_node, IByteReturn, IAntNode
 public class SenseBlockBelow : Leaf_node, IHByteReturn, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        AntController ant = controller.getCurrentProcessingAnt();
+        AntController ant = controller.GetCurrentProcessingAnt();
         AbstractBlock block = controller.GetBlock(ant.blockPos.x, ant.blockPos.y - 1, ant.blockPos.z);
         if (block is AcidicBlock)
             return 0;
@@ -264,14 +264,14 @@ public class SenseBlockBelow : Leaf_node, IHByteReturn, IAntNode
 public class SenseBlockAhead : Leaf_node, IHByteReturn, IAntNode
 {
     WorldManager controller;
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        AntController ant = controller.getCurrentProcessingAnt();
+        AntController ant = controller.GetCurrentProcessingAnt();
         Vector3Int toCheck = ant.blockPos + ant.heading;
         AbstractBlock block = controller.GetBlock(toCheck.x, toCheck.y, toCheck.z);
         if (block is AcidicBlock)
@@ -306,7 +306,7 @@ public class CreateNest : Leaf_node, IAntNode, IAction
         return "CREATE_NEST";
     }
 
-    public void setAnt(WorldManager antController)
+    public void setWorld(WorldManager antController)
     {
         ant = antController;
     }
@@ -325,41 +325,104 @@ public class AntController : MonoBehaviour
     public int currentHealth = 0;
     int healthDec = -1;
 
-    public Vector3Int heading = new Vector3Int(0,1,0);
+    public Vector3Int heading;
     public Vector3Int blockPos = Vector3Int.zero;
 
-    enum antType { WORKER, QUEEN };
-    antType type = antType.WORKER;
+    public enum antType { WORKER, QUEEN };
+    public antType type = antType.WORKER;
+
+    ASTEvaluator evaluator;
 
     // Start is called before the first frame update
     void Start()
     {
+        evaluator = new ASTEvaluator(brain);
+    }
+
+    private void Awake()
+    {
         currentHealth = maxHealth;
         blockPos = Vector3Int.FloorToInt(transform.position);
+        heading = new Vector3Int(1, 0, 0);
     }
 
-    // Update is called once per frame
-    //void Update()
-    //{
-    //    int y = 0;
-    //    while (world.GetBlock(blockPos.x, y, blockPos.z) is not AirBlock)
-    //    {
-    //        y++;
-    //    }
-    //    blockPos.y = y;
-    //    transform.position = blockPos - new Vector3(0,0.5f,0);
-    //}
+    public void MoveToBlockCoord(Vector3Int block)
+    {
+        blockPos.x = Math.Clamp(block.x, 0, ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter - 1);
+        blockPos.y = Math.Max(block.y,0);
+        blockPos.z = Math.Clamp(block.z, 0, ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter - 1);
+        transform.position = blockPos - new Vector3(0, 0.5f, 0);
+    }
 
     //will cause the action to parse its brain until the next ant action node is encountered
-    void step()
+    public void Step()
     {
-        //SIMULATION STEPS
-        //1. Save state for every ant like phereomone concentrations and ant count. This avoids effects of sequential processing
-        //2. Move the AST evaluator to the next action node and execute it
-    }
+        //handle health
+        currentHealth += healthDec;
+        //standing on a acid block is more costly
+        if (world.GetBlock(blockPos.x, blockPos.y - 1, blockPos.z) is AcidicBlock)
+            currentHealth += healthDec;
 
-    bool digBelow()
-    {
-        return true;
+        Tuple<Type, byte[]> frame = evaluator.getNextAction();
+        Type action = frame.Item1;
+        byte[] arguments = frame.Item2;
+
+        //Debug.Log(action.ToString());
+
+        if (action == typeof(MoveForward))
+        {
+            Vector3Int bCoordAhead = blockPos + heading;
+            int nextPosHeight = 0;
+            while (world.GetBlock(bCoordAhead.x, nextPosHeight, bCoordAhead.z) is not AirBlock)
+                nextPosHeight++;
+
+            if (Math.Abs(blockPos.y - nextPosHeight) <= 2)
+                MoveToBlockCoord(new Vector3Int(bCoordAhead.x, nextPosHeight, bCoordAhead.z));
+        } 
+        else if(action == typeof(TurnRight)) {
+            int[] old = { heading.x, heading.z };
+            heading.x = old[1];
+            heading.z = -old[0];
+        }
+        else if (action == typeof(TurnLeft))
+        {
+            int[] old = { heading.x, heading.z };
+            heading.x = -old[1];
+            heading.z = old[0];
+        }
+        else if (action == typeof(Consume))
+        {
+            if(world.GetBlock(blockPos.x, blockPos.y - 1, blockPos.z) is MulchBlock && world.antsAtBlock(blockPos.x, blockPos.y, blockPos.z).Count == 1)
+            {
+                world.SetBlock(blockPos.x, blockPos.y - 1, blockPos.z, new AirBlock());
+                currentHealth = maxHealth;
+            }
+        }
+        else if (action == typeof(Dig))
+        {
+            if (world.GetBlock(blockPos.x, blockPos.y - 1, blockPos.z) is not ContainerBlock)
+                world.SetBlock(blockPos.x, blockPos.y - 1, blockPos.z, new AirBlock());
+        }
+        else if (action == typeof(TransferEnergy))
+        {
+            List<AntController> ants = world.antsAtBlock(blockPos.x, blockPos.y, blockPos.z);
+            int amountPerAnt = currentHealth / ants.Count;
+            foreach(AntController ant in ants)
+                ant.currentHealth += amountPerAnt;
+            currentHealth -= amountPerAnt * ants.Count;
+        }
+        else if (action == typeof(DepositPheromone))
+        {
+            world.addPheromone(blockPos.x, blockPos.z, arguments[0], arguments[1]);
+        }
+        else if (action == typeof(SetValue))
+        {
+            values[arguments[0]] = arguments[1];
+        }
+        else if (action == typeof(CreateNest))
+        {
+            currentHealth -= maxHealth / 3;
+            world.SetBlock(blockPos.x, blockPos.y, blockPos.z, new NestBlock());
+        }
     }
 }

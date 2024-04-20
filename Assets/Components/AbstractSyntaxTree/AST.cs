@@ -34,7 +34,7 @@ public interface IHByteReturn : IReturnable { }
 public interface IAction { }
 
 //specified a class contains a value like a number or boolean. This is useful for mutations where we might want to change the number but leave it a constant
-public interface IValue { }
+public interface IValue : IReturnable { public void SetValue(byte value); }
 
 
 // Base class for AST nodes
@@ -43,7 +43,7 @@ public abstract class AST_node
     public AST_node parent;
     //prevent this class being made outside this file
     //the constructor will automatically create children to ensure valid state
-    internal AST_node() {}
+    internal AST_node() { parent = null;  }
 
     //return a string that describes the subtree starting at this node
     public abstract string GetSubtreeString();
@@ -86,15 +86,11 @@ public abstract class Internal_node : AST_node
             //check to ensure we found a node
             if (implementingTypes.Count() == 0)
                 throw new Exception("CRITICAL ERROR: Tried to find AST_node with " + type + " return but none were found");
-            //}
+
             Type nodeType = implementingTypes.ElementAt(UnityEngine.Random.Range(0, implementingTypes.Count()));
-            //if (typeof(Internal_node).IsAssignableFrom(node))
             AST_node node = (AST_node)Activator.CreateInstance(nodeType);
             Children.Add(node);
             node.parent = this;
-
-            //else
-                //Children.Add((AST_node)Activator.CreateInstance(node, remainingDepth - 1));
         }
     }
 
@@ -106,18 +102,26 @@ public abstract class Leaf_node : AST_node
 {
 }
 
+/*
+ * Implementations of nodes
+ */
 
 /*
  * Constant nodes
  */
 sealed class Constant_bool : Leaf_node, IBoolReturn, IValue
 {
-    private readonly byte Value;
+    private byte Value;
     public Constant_bool(byte value) { this.Value = value; }
 
     public Constant_bool()
     {
-        this.Value = (byte)UnityEngine.Random.Range(0, 2);
+        SetValue((byte)UnityEngine.Random.Range(0, 2));
+    }
+
+    public void SetValue(byte value)
+    {
+        this.Value = value;
     }
 
     public byte Evaluate(List<byte> parameters)
@@ -133,12 +137,17 @@ sealed class Constant_bool : Leaf_node, IBoolReturn, IValue
 
 sealed class Constant_byte : Leaf_node, IByteReturn, IValue
 {
-    private readonly byte Value;
+    private byte Value;
     public Constant_byte(byte value) { this.Value = value; }
 
     public Constant_byte()
     {
-        this.Value = (byte)UnityEngine.Random.Range(0, 256);
+        SetValue((byte)UnityEngine.Random.Range(0, 256));
+    }
+
+    public void SetValue(byte value)
+    {
+        this.Value = value;
     }
 
     public byte Evaluate(List<byte> parameters)
@@ -154,12 +163,17 @@ sealed class Constant_byte : Leaf_node, IByteReturn, IValue
 
 sealed class Constant_hbyte : Leaf_node, IHByteReturn, IValue
 {
-    private readonly byte Value;
+    private byte Value;
     public Constant_hbyte(byte value) { this.Value = value; }
 
     public Constant_hbyte()
     {
-        this.Value = (byte)UnityEngine.Random.Range(0, 16);
+        SetValue((byte)UnityEngine.Random.Range(0, 16));
+    }
+
+    public void SetValue(byte value)
+    {
+        this.Value = value;
     }
 
     public byte Evaluate(List<byte> parameters)
@@ -410,24 +424,70 @@ sealed public class GT_node : Internal_node, IBoolReturn
 
 public class AST
 {
-    List<AST_node> nodes = new List<AST_node>();
+    public List<AST_node> nodes = new List<AST_node>();
     List<Type> nodeTypes = new List<Type>();
 
     public readonly SequenceNode root;
 
-    public AST()
+    //technically can be done with a tuple but I want the variable names so the logic is readable
+    struct NodeMirror
+    {
+        public AST_node original;
+        public AST_node copy;
+        public NodeMirror(AST_node original, AST_node copy)
+        {
+            this.original = original;
+            this.copy = copy;
+        }
+    }
+
+    private void RegisterNodes()
     {
         //these nodes are always part of program structure
         RegisterUserNodeType(typeof(Constant_bool));
-        RegisterUserNodeType(typeof(Constant_byte));
-        RegisterUserNodeType(typeof(Constant_hbyte));
-        RegisterUserNodeType(typeof(NOOP));
-        RegisterUserNodeType(typeof(SequenceNode));
+        //RegisterUserNodeType(typeof(Constant_byte));
+        //RegisterUserNodeType(typeof(Constant_hbyte));
+        //RegisterUserNodeType(typeof(NOOP));
+        //RegisterUserNodeType(typeof(SequenceNode));
         RegisterUserNodeType(typeof(IfElseNode));
-        RegisterUserNodeType(typeof(AND_node));
-        RegisterUserNodeType(typeof(OR_node));
-        RegisterUserNodeType(typeof(NOT_node));
-        RegisterUserNodeType(typeof(GT_node));
+        //RegisterUserNodeType(typeof(AND_node));
+        //RegisterUserNodeType(typeof(OR_node));
+        //RegisterUserNodeType(typeof(NOT_node));
+        //RegisterUserNodeType(typeof(GT_node));
+    }
+
+    public AST(AST other)
+    {
+        RegisterNodes();
+        //we need to copy the tree structure while making new nodes and setting child/parent relations to be correct...
+        Stack<NodeMirror> toProcess = new Stack<NodeMirror>();
+        root = new SequenceNode();
+        toProcess.Push(new NodeMirror(other.root, root));
+        
+        while(toProcess.Count > 0)
+        {
+            NodeMirror processing = toProcess.Pop();
+            if(processing.original is Internal_node iNode)
+            {
+                foreach(AST_node child in iNode.Children)
+                {
+                    AST_node copy = (AST_node)Activator.CreateInstance(child.GetType());
+                    copy.parent = processing.copy;
+                    ((Internal_node)processing.copy).Children.Add(copy);
+                    toProcess.Push(new NodeMirror(child, copy));
+                    nodes.Add(copy);
+                }
+            }
+            if(processing.original is IValue vNode)
+            {
+                ((IValue)processing.copy).SetValue(vNode.Evaluate(new List<byte>()));
+            }
+        }
+    }
+
+    public AST()
+    {
+        RegisterNodes();
 
         //create barebones structure
         root = new SequenceNode(); //a squence node is ALWAYS the root
@@ -440,6 +500,27 @@ public class AST
     {
         if(type.IsSubclassOf(typeof(AST_node))) 
             nodeTypes.Add(type);
+    }
+
+    public bool RandomMutation()
+    {
+        List<int> choices = new List<int>(){ 0, 1, 2, 3 };
+        while(choices.Count > 0)
+        {
+            int choice = choices[UnityEngine.Random.Range(0, choices.Count)];
+            bool result = false;
+            switch (choice)
+            {
+                case 0: result = HoistMutate(); break;
+                case 1: result = ShrinkMutate(); break;
+                case 2: result = ExpandMutate(); break;
+                case 3: result = PointMutate(); break;
+            }
+            if (result)
+                return true;
+            choices.Remove(choice);
+        }
+        return false;
     }
 
     //invalidates evaluators!
@@ -644,22 +725,32 @@ public class AST
             ValueType retType = parent.getChildrenTypes()[indexInParent];
             List<Type> replacementTypes = NodesWithReturnType(retType); //based on the parents expectation for the children find replacements that can fit the interface
 
-            //filter replacements to only be internal nodes
-            for(int i = replacementTypes.Count-1; i >= 0; i--)
+            //filter replacements to only be internal nodes (unless the candidate is a sequence node)
+            if (candidate is SequenceNode)
             {
-                if (!replacementTypes[i].IsSubclassOf(typeof(Internal_node)))
-                    replacementTypes.RemoveAt(i);
+                for (int i = replacementTypes.Count - 1; i >= 0; i--)
+                    if (!replacementTypes[i].IsSubclassOf(typeof(Leaf_node)))
+                        replacementTypes.RemoveAt(i);
+            }
+            else
+            {
+                for (int j = replacementTypes.Count - 1; j >= 0; j--)
+                    if (!replacementTypes[j].IsSubclassOf(typeof(Internal_node)))
+                        replacementTypes.RemoveAt(j);
             }
 
             if (replacementTypes.Count > 0)
             {
                 int ReplacementIndex = UnityEngine.Random.Range(0, replacementTypes.Count);
-                Internal_node replacement = (Internal_node)Activator.CreateInstance(replacementTypes[ReplacementIndex]);
-                replacement.GenerateTerminalChildren(nodeTypes);
+                AST_node replacement = (AST_node)Activator.CreateInstance(replacementTypes[ReplacementIndex]);
+                if(candidate is not SequenceNode)
+                    ((Internal_node)replacement).GenerateTerminalChildren(nodeTypes);
                 //switch out the node
                 //sequence node is special since it gains a new child instead of being a leaf that needs to be switched
                 nodes.Add(replacement);
-                nodes.AddRange(replacement.Children);
+                if (candidate is not SequenceNode)
+                    nodes.AddRange(((Internal_node)replacement).Children);
+
                 if (candidate is SequenceNode seq)
                 {
                     seq.Children.Add(replacement);
@@ -754,35 +845,37 @@ public class ASTEvaluator
     public ASTEvaluator(AST tree)
     {
         Node_frame frame = new Node_frame();
-        frame.childrenValues = new List<byte>();
         frame.node = tree.root;
         frame.currentChild = 0;
-        FrameStack.Push(frame);
+        //if there are no actionable nodes then the evalutator would never return so we just prevent any evaluation from happening
+        if (tree.nodes.OfType<IAction>().Count() > 0)
+            FrameStack.Push(frame);
     }
 
     //iterate through the tree evaluating as much as possible until a action_node that can be evaulated (all child subtrees have been processed) is reached and the node type is returned
     //null is returned if the first node is reached without any action nodes to prevent infinite loop
-    public Type getNextAction()
+    public Tuple<Type, byte[]> getNextAction()
     {
-        if(FrameStack.Count == 0) return null; //check to make sure there is at least one stack frame. If there isn't something is wrong
-        Node_frame currentFrame = FrameStack.Peek();
-        AST_node startingNode = currentFrame.node;
+        if(FrameStack.Count == 0) return null; //check to make sure there is at least one stack frame
 
-        do
+        while(true)
         {
-            currentFrame = FrameStack.Peek();
+            Node_frame currentFrame = FrameStack.Peek();
 
             //Check if the current node has all subtrees processed 
             if (currentFrame.node is Leaf_node || (currentFrame.node is Internal_node && (currentFrame.currentChild >= ((Internal_node)currentFrame.node).Children.Count)))
             {
                 //if the subtrees have been processed we can now attempt to evaluate the node or have an action executed
+                //since this node is all done remove it from the stack
+                if (currentFrame.node.parent != null)
+                    FrameStack.Pop();
+                else //special case for the top most node since it MUST loop so we reset the child counter
+                    currentFrame.currentChild = 0;
 
                 //check if it is an action and return it for processing
                 if (currentFrame.node is IAction)
-                    return currentFrame.node.GetType();
-
-                //since this node is all done remove it from the stack
-                FrameStack.Pop();
+                    return new Tuple<Type, byte[]>(currentFrame.node.GetType(), currentFrame.childrenValues.ToArray());
+                
 
                 //if it is a node to be evaluated then evaluate it
                 if (currentFrame.node is IReturnable ret)
@@ -836,9 +929,6 @@ public class ASTEvaluator
                     Debug.LogError("Holy shit something really unexpected happened in the AST evaluator, I should not be printed!");
                 }
             }
-        } while (startingNode != FrameStack.Peek().node);
-        
-
-        return null;
+        }
     }
 }

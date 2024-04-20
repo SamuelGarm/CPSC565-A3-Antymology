@@ -78,10 +78,15 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -7635826562936255635, guid: 074f8d5992dbf394e9fd33e2962faa52,
+        type: 3}
+      propertyPath: m_DynamicOccludee
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 074f8d5992dbf394e9fd33e2962faa52,
         type: 3}
       propertyPath: m_Name
-      value: ant
+      value: Ant
       objectReference: {fileID: 0}
     - target: {fileID: 1151388028547126963, guid: 074f8d5992dbf394e9fd33e2962faa52,
         type: 3}
@@ -116,3 +121,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   world: {fileID: 0}
+  values: 00000000000000000000000000000000
+  currentHealth: 0
+  heading: {x: 0, y: 1, z: 0}
+  blockPos: {x: 0, y: 0, z: 0}
+  type: 0
