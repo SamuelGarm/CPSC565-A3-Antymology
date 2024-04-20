@@ -5,20 +5,21 @@ using UnityEngine;
 
 interface IAntNode
 {
-    void setAnt(antController antController);
+    void setAnt(WorldManager controller);
 }
 
 public class AntHealth : Leaf_node, IByteReturn, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        throw new NotImplementedException();
+        //Ensures that health above 255 doesn't get wrapped and instead is treated as 255
+        return (byte)Math.Min(controller.getCurrentProcessingAnt().currentHealth, byte.MaxValue);
     }
 
     public override string GetSubtreeString()
@@ -29,8 +30,8 @@ public class AntHealth : Leaf_node, IByteReturn, IAntNode
 
 public class AntsHere : Leaf_node, IByteReturn, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -42,14 +43,15 @@ public class AntsHere : Leaf_node, IByteReturn, IAntNode
 
     public byte Evaluate(List<byte> parameters)
     {
-        throw new NotImplementedException();
+        AntController ant = controller.getCurrentProcessingAnt();
+        return (byte)controller.CountAntsAtBlock(ant.blockPos.x, ant.blockPos.y, ant.blockPos.z);
     }
 }
 
 public class MoveForward : Leaf_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -62,8 +64,8 @@ public class MoveForward : Leaf_node, IAction, IAntNode
 
 public class TurnRight : Leaf_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -76,8 +78,8 @@ public class TurnRight : Leaf_node, IAction, IAntNode
 
 public class TurnLeft : Leaf_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -90,8 +92,8 @@ public class TurnLeft : Leaf_node, IAction, IAntNode
 
 public class Consume : Leaf_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -104,8 +106,8 @@ public class Consume : Leaf_node, IAction, IAntNode
 
 public class Dig : Leaf_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -118,8 +120,8 @@ public class Dig : Leaf_node, IAction, IAntNode
 
 public class TransferEnergy : Internal_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -137,8 +139,8 @@ public class TransferEnergy : Internal_node, IAction, IAntNode
 
 public class DepositPheromone : Internal_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -156,15 +158,16 @@ public class DepositPheromone : Internal_node, IAction, IAntNode
 
 public class GetValue : Internal_node, IBoolReturn, IByteReturn, IHByteReturn, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        throw new NotImplementedException();
+        AntController ant = controller.getCurrentProcessingAnt();
+        return ant.values[parameters[0]];
     }
 
     public override string GetSubtreeString()
@@ -180,8 +183,8 @@ public class GetValue : Internal_node, IBoolReturn, IByteReturn, IHByteReturn, I
 
 public class SetValue : Internal_node, IAction, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
@@ -202,15 +205,16 @@ public class SetValue : Internal_node, IAction, IAntNode
  */
 public class SensePheromone : Internal_node, IByteReturn, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        throw new NotImplementedException();
+        AntController ant = controller.getCurrentProcessingAnt();
+        return (byte)Math.Min(controller.pheromoneAtBlock(ant.blockPos.x, ant.blockPos.y, ant.blockPos.z), byte.MaxValue);
     }
 
     public override string GetSubtreeString()
@@ -226,15 +230,29 @@ public class SensePheromone : Internal_node, IByteReturn, IAntNode
 
 public class SenseBlockBelow : Leaf_node, IHByteReturn, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        throw new NotImplementedException();
+        AntController ant = controller.getCurrentProcessingAnt();
+        AbstractBlock block = controller.GetBlock(ant.blockPos.x, ant.blockPos.y - 1, ant.blockPos.z);
+        if (block is AcidicBlock)
+            return 0;
+        if (block is ContainerBlock)
+            return 1;
+        if (block is GrassBlock)
+            return 2;
+        if (block is MulchBlock)
+            return 3;
+        if (block is NestBlock)
+            return 4;
+        if (block is StoneBlock)
+            return 5;
+        return 6; //just in case
     }
 
     public override string GetSubtreeString()
@@ -245,15 +263,30 @@ public class SenseBlockBelow : Leaf_node, IHByteReturn, IAntNode
 
 public class SenseBlockAhead : Leaf_node, IHByteReturn, IAntNode
 {
-    antController controller;
-    public void setAnt(antController antController)
+    WorldManager controller;
+    public void setAnt(WorldManager antController)
     {
         controller = antController;
     }
 
     public byte Evaluate(List<byte> parameters)
     {
-        throw new NotImplementedException();
+        AntController ant = controller.getCurrentProcessingAnt();
+        Vector3Int toCheck = ant.blockPos + ant.heading;
+        AbstractBlock block = controller.GetBlock(toCheck.x, toCheck.y, toCheck.z);
+        if (block is AcidicBlock)
+            return 0;
+        if (block is ContainerBlock)
+            return 1;
+        if (block is GrassBlock)
+            return 2;
+        if (block is MulchBlock)
+            return 3;
+        if (block is NestBlock)
+            return 4;
+        if (block is StoneBlock)
+            return 5;
+        return 6; //just in case
     }
 
     public override string GetSubtreeString()
@@ -262,22 +295,41 @@ public class SenseBlockAhead : Leaf_node, IHByteReturn, IAntNode
     }
 }
 
-
-
-public class antController : MonoBehaviour
+/*
+ * Queen specific functions
+ */
+public class CreateNest : Leaf_node, IAntNode, IAction
 {
-    
+    WorldManager ant;
+    public override string GetSubtreeString()
+    {
+        return "CREATE_NEST";
+    }
+
+    public void setAnt(WorldManager antController)
+    {
+        ant = antController;
+    }
+}
+
+/*
+ * Controller class
+ */
+public class AntController : MonoBehaviour
+{
+    public AST brain;
     public WorldManager world;
 
-    byte[] values;
+    public byte[] values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     int maxHealth = 100;
-    int currentHealth = 0;
+    public int currentHealth = 0;
     int healthDec = -1;
 
-    private Vector3Int blockPos = Vector3Int.zero;
+    public Vector3Int heading = new Vector3Int(0,1,0);
+    public Vector3Int blockPos = Vector3Int.zero;
 
-    enum antType { WORKER, QUEEN }
-    antType type;
+    enum antType { WORKER, QUEEN };
+    antType type = antType.WORKER;
 
     // Start is called before the first frame update
     void Start()
@@ -287,15 +339,23 @@ public class antController : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
+    //void Update()
+    //{
+    //    int y = 0;
+    //    while (world.GetBlock(blockPos.x, y, blockPos.z) is not AirBlock)
+    //    {
+    //        y++;
+    //    }
+    //    blockPos.y = y;
+    //    transform.position = blockPos - new Vector3(0,0.5f,0);
+    //}
+
+    //will cause the action to parse its brain until the next ant action node is encountered
+    void step()
     {
-        int y = 0;
-        while (world.GetBlock(blockPos.x, y, blockPos.z) is not AirBlock)
-        {
-            y++;
-        }
-        blockPos.y = y;
-        transform.position = blockPos - new Vector3(0,0.5f,0);
+        //SIMULATION STEPS
+        //1. Save state for every ant like phereomone concentrations and ant count. This avoids effects of sequential processing
+        //2. Move the AST evaluator to the next action node and execute it
     }
 
     bool digBelow()

@@ -41,6 +41,9 @@ namespace Antymology.Terrain
         /// </summary>
         private SimplexNoise SimplexNoise;
 
+        private AST workerAST;
+        private AST queenAST;
+
         #endregion
 
         #region Initialization
@@ -50,6 +53,8 @@ namespace Antymology.Terrain
         /// </summary>
         void Awake()
         {
+            UnityEngine.Random.InitState((int)DateTime.Now.Ticks);
+
             // Generate new random number generator
             RNG = new System.Random(ConfigurationManager.Instance.Seed);
 
@@ -67,6 +72,39 @@ namespace Antymology.Terrain
                 ConfigurationManager.Instance.World_Diameter,
                 ConfigurationManager.Instance.World_Height,
                 ConfigurationManager.Instance.World_Diameter];
+
+            workerAST = new AST();
+            workerAST.RegisterUserNodeType(typeof(AntHealth));
+            workerAST.RegisterUserNodeType(typeof(AntsHere));
+            workerAST.RegisterUserNodeType(typeof(MoveForward));
+            workerAST.RegisterUserNodeType(typeof(TurnRight));
+            workerAST.RegisterUserNodeType(typeof(TurnLeft));
+            workerAST.RegisterUserNodeType(typeof(Consume));
+            workerAST.RegisterUserNodeType(typeof(Dig));
+            workerAST.RegisterUserNodeType(typeof(TransferEnergy));
+            workerAST.RegisterUserNodeType(typeof(DepositPheromone));
+            workerAST.RegisterUserNodeType(typeof(GetValue));
+            workerAST.RegisterUserNodeType(typeof(SetValue));
+            workerAST.RegisterUserNodeType(typeof(SensePheromone));
+            workerAST.RegisterUserNodeType(typeof(SenseBlockBelow));
+            workerAST.RegisterUserNodeType(typeof(SenseBlockAhead));
+
+            queenAST = new AST();
+            queenAST.RegisterUserNodeType(typeof(AntHealth));
+            queenAST.RegisterUserNodeType(typeof(AntsHere));
+            queenAST.RegisterUserNodeType(typeof(MoveForward));
+            queenAST.RegisterUserNodeType(typeof(TurnRight));
+            queenAST.RegisterUserNodeType(typeof(TurnLeft));
+            queenAST.RegisterUserNodeType(typeof(Consume));
+            queenAST.RegisterUserNodeType(typeof(Dig));
+            queenAST.RegisterUserNodeType(typeof(TransferEnergy));
+            queenAST.RegisterUserNodeType(typeof(DepositPheromone));
+            queenAST.RegisterUserNodeType(typeof(GetValue));
+            queenAST.RegisterUserNodeType(typeof(SetValue));
+            queenAST.RegisterUserNodeType(typeof(SensePheromone));
+            queenAST.RegisterUserNodeType(typeof(SenseBlockBelow));
+            queenAST.RegisterUserNodeType(typeof(SenseBlockAhead));
+            queenAST.RegisterUserNodeType(typeof(CreateNest)); //Unique to queen
         }
 
         /// <summary>
@@ -83,6 +121,26 @@ namespace Antymology.Terrain
             GenerateAnts();
         }
 
+        public AntController getCurrentProcessingAnt()
+        {
+            return null;
+        }
+
+        public int CountAntsAtBlock(int x, int y, int z)
+        {
+            return 0;
+        }
+
+        public List<AntController> antsAtBlock(int x, int y, int z)
+        {
+            return new List<AntController>();
+        }
+
+        public int pheromoneAtBlock(int x, int y, int z)
+        {
+            return 0;
+        }
+
         /// <summary>
         /// TO BE IMPLEMENTED BY YOU
         /// </summary>
@@ -94,10 +152,14 @@ namespace Antymology.Terrain
                 int spawnz = UnityEngine.Random.Range(1, 16 * 8 - 1);
                 Vector3 spawnPos = new Vector3(spawnx, 0, spawnz);
                 GameObject antObject = Instantiate(antPrefab, spawnPos, Quaternion.identity);
-                antController antScript = antObject.GetComponent<antController>();
+                AntController antScript = antObject.GetComponent<AntController>();
                 if(antScript != null)
                 {
                     antScript.world = this;
+                    if (i == 0)
+                        antScript.brain = queenAST;
+                    else
+                        antScript.brain = workerAST;
                 }
             }
         }
