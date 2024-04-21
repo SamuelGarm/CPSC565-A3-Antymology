@@ -445,20 +445,22 @@ public class AST
     {
         //these nodes are always part of program structure
         RegisterUserNodeType(typeof(Constant_bool));
-        //RegisterUserNodeType(typeof(Constant_byte));
-        //RegisterUserNodeType(typeof(Constant_hbyte));
-        //RegisterUserNodeType(typeof(NOOP));
-        //RegisterUserNodeType(typeof(SequenceNode));
+        RegisterUserNodeType(typeof(Constant_byte));
+        RegisterUserNodeType(typeof(Constant_hbyte));
+        RegisterUserNodeType(typeof(NOOP));
+        RegisterUserNodeType(typeof(SequenceNode));
         RegisterUserNodeType(typeof(IfElseNode));
-        //RegisterUserNodeType(typeof(AND_node));
-        //RegisterUserNodeType(typeof(OR_node));
-        //RegisterUserNodeType(typeof(NOT_node));
-        //RegisterUserNodeType(typeof(GT_node));
+        RegisterUserNodeType(typeof(AND_node));
+        RegisterUserNodeType(typeof(OR_node));
+        RegisterUserNodeType(typeof(NOT_node));
+        RegisterUserNodeType(typeof(GT_node));
     }
 
     public AST(AST other)
     {
-        RegisterNodes();
+        foreach (Type nodeT in other.nodeTypes)
+            RegisterUserNodeType(nodeT);
+
         //we need to copy the tree structure while making new nodes and setting child/parent relations to be correct...
         Stack<NodeMirror> toProcess = new Stack<NodeMirror>();
         root = new SequenceNode();
@@ -511,7 +513,7 @@ public class AST
             bool result = false;
             switch (choice)
             {
-                case 0: result = HoistMutate(); break;
+                //case 0: result = HoistMutate(); break;
                 case 1: result = ShrinkMutate(); break;
                 case 2: result = ExpandMutate(); break;
                 case 3: result = PointMutate(); break;
@@ -566,6 +568,8 @@ public class AST
                 candidate.Children[i] = null;
                 candidate.parent = null;
             }
+
+            nodes.Remove(candidate);
 
             parent.Children[indexInParent] = hoistChild;
             hoistChild.parent = parent;

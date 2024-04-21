@@ -49,6 +49,8 @@ namespace Antymology.Terrain
         /// </summary>
         MeshCollider collider;
 
+        public WorldManager world;
+
         #endregion
 
         #region Methods
@@ -74,7 +76,7 @@ namespace Antymology.Terrain
         /// <returns>The Block with local coordinates from this chunk.</returns>
         public AbstractBlock GetBlock(int localXCoordinate, int localYCoordinate, int localZCoordinate)
         {
-            return WorldManager.Instance.GetBlock(localXCoordinate + x, localYCoordinate + y, localZCoordinate + z);
+            return world.GetBlock(localXCoordinate + x, localYCoordinate + y, localZCoordinate + z);
         }
 
         /// <summary>
@@ -194,10 +196,10 @@ namespace Antymology.Terrain
         /// <param name="numFaces">The number of faces currently added. Used for counting triangles.</param>
         void AddPosYFace(int x, int y, int z, AbstractBlock block, List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, ref int numFaces)
         {
-            vertices.Add(new Vector3(x, y, z + 1));
-            vertices.Add(new Vector3(x + 1, y, z + 1));
-            vertices.Add(new Vector3(x + 1, y, z));
-            vertices.Add(new Vector3(x, y, z));
+            vertices.Add(new Vector3(x, y + 1, z + 1));
+            vertices.Add(new Vector3(x + 1, y + 1, z + 1));
+            vertices.Add(new Vector3(x + 1, y + 1, z));
+            vertices.Add(new Vector3(x, y + 1, z));
             AddRecent6Triangles(triangles, ref numFaces);
             AddRecentFaceTexture(block, uvs);
         }
@@ -215,10 +217,10 @@ namespace Antymology.Terrain
         /// <param name="numFaces">The number of faces currently added. Used for counting triangles.</param>
         void AddNegYFace(int x, int y, int z, AbstractBlock block, List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, ref int numFaces)
         {
-            vertices.Add(new Vector3(x, y - 1, z));
-            vertices.Add(new Vector3(x + 1, y - 1, z));
-            vertices.Add(new Vector3(x + 1, y - 1, z + 1));
-            vertices.Add(new Vector3(x, y - 1, z + 1));
+            vertices.Add(new Vector3(x, y, z));
+            vertices.Add(new Vector3(x + 1, y, z));
+            vertices.Add(new Vector3(x + 1, y, z + 1));
+            vertices.Add(new Vector3(x, y, z + 1));
             AddRecent6Triangles(triangles, ref numFaces);
             AddRecentFaceTexture(block, uvs);
         }
@@ -236,10 +238,10 @@ namespace Antymology.Terrain
         /// <param name="numFaces">The number of faces currently added. Used for counting triangles.</param>
         void AddPosZFace(int x, int y, int z, AbstractBlock block, List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, ref int numFaces)
         {
-            vertices.Add(new Vector3(x + 1, y - 1, z + 1));
             vertices.Add(new Vector3(x + 1, y, z + 1));
+            vertices.Add(new Vector3(x + 1, y+1, z + 1));
+            vertices.Add(new Vector3(x, y+1, z + 1));
             vertices.Add(new Vector3(x, y, z + 1));
-            vertices.Add(new Vector3(x, y - 1, z + 1));
             AddRecent6Triangles(triangles, ref numFaces);
             AddRecentFaceTexture(block, uvs);
         }
@@ -257,10 +259,10 @@ namespace Antymology.Terrain
         /// <param name="numFaces">The number of faces currently added. Used for counting triangles.</param>
         void AddPosXFace(int x, int y, int z, AbstractBlock block, List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, ref int numFaces)
         {
-            vertices.Add(new Vector3(x + 1, y - 1, z));
             vertices.Add(new Vector3(x + 1, y, z));
+            vertices.Add(new Vector3(x + 1, y+1, z));
+            vertices.Add(new Vector3(x + 1, y+1, z + 1));
             vertices.Add(new Vector3(x + 1, y, z + 1));
-            vertices.Add(new Vector3(x + 1, y - 1, z + 1));
             AddRecent6Triangles(triangles, ref numFaces);
             AddRecentFaceTexture(block, uvs);
         }
@@ -278,10 +280,10 @@ namespace Antymology.Terrain
         /// <param name="numFaces">The number of faces currently added. Used for counting triangles.</param>
         void AddNegZFace(int x, int y, int z, AbstractBlock block, List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, ref int numFaces)
         {
-            vertices.Add(new Vector3(x, y - 1, z));
             vertices.Add(new Vector3(x, y, z));
+            vertices.Add(new Vector3(x, y+1, z));
+            vertices.Add(new Vector3(x + 1, y+1, z));
             vertices.Add(new Vector3(x + 1, y, z));
-            vertices.Add(new Vector3(x + 1, y - 1, z));
             AddRecent6Triangles(triangles, ref numFaces);
             AddRecentFaceTexture(block, uvs);
         }
@@ -299,10 +301,10 @@ namespace Antymology.Terrain
         /// <param name="numFaces">The number of faces currently added. Used for counting triangles.</param>
         void AddNegXFace(int x, int y, int z, AbstractBlock block, List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, ref int numFaces)
         {
-            vertices.Add(new Vector3(x, y - 1, z + 1));
             vertices.Add(new Vector3(x, y, z + 1));
+            vertices.Add(new Vector3(x, y + 1, z + 1));
+            vertices.Add(new Vector3(x, y + 1, z));
             vertices.Add(new Vector3(x, y, z));
-            vertices.Add(new Vector3(x, y - 1, z));
             AddRecent6Triangles(triangles, ref numFaces);
             AddRecentFaceTexture(block, uvs);
         }

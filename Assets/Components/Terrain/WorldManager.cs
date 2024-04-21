@@ -4,11 +4,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using UnityEditor.Search;
 using UnityEngine;
 
 namespace Antymology.Terrain
 {
-    public class WorldManager : Singleton<WorldManager>
+    public class WorldManager : MonoBehaviour
     {
 
         #region Fields
@@ -43,8 +44,8 @@ namespace Antymology.Terrain
         /// </summary>
         private SimplexNoise SimplexNoise;
 
-        private AST workerAST;
-        private AST queenAST;
+        public AST workerAST;
+        public AST queenAST;
 
         /// <summary>
         /// for performance reasons I elected to make pheromones a 2D array rather than a proper 3D one
@@ -56,12 +57,14 @@ namespace Antymology.Terrain
         /// </summary>
         private List<AntController>[,] antsAtLocation;
 
-        List<AntController> ants;
+        public List<AntController> ants;
 
         AntController currentlyProcessing = null;
 
         public Material queenMaterial;
         public GameObject queenMarker;
+
+        public int nestBlocks = 0;
 
         #endregion
 
@@ -97,16 +100,6 @@ namespace Antymology.Terrain
             ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
             16];
 
-            antsAtLocation = new List<AntController>[
-            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
-            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
-            for (int i = 0; i < antsAtLocation.GetLength(0); i++)
-                for (int j = 0; j < antsAtLocation.GetLength(1); j++)
-                    antsAtLocation[i, j] = new List<AntController>();
-
-
-                    ants = new List<AntController>();
-
             workerAST = new AST();
             workerAST.RegisterUserNodeType(typeof(AntHealth));
             workerAST.RegisterUserNodeType(typeof(AntsHere));
@@ -122,9 +115,6 @@ namespace Antymology.Terrain
             workerAST.RegisterUserNodeType(typeof(SensePheromone));
             workerAST.RegisterUserNodeType(typeof(SenseBlockBelow));
             workerAST.RegisterUserNodeType(typeof(SenseBlockAhead));
-            //give it some starting nodes
-            for (int i = 0; i < 5; i++)
-                workerAST.ExpandMutate();
 
             queenAST = new AST();
             queenAST.RegisterUserNodeType(typeof(AntHealth));
@@ -142,51 +132,44 @@ namespace Antymology.Terrain
             queenAST.RegisterUserNodeType(typeof(SenseBlockBelow));
             queenAST.RegisterUserNodeType(typeof(SenseBlockAhead));
             queenAST.RegisterUserNodeType(typeof(CreateNest)); //Unique to queen
-            //give it some starting nodes
-            for (int i = 0; i < 5; i++)
-                queenAST.ExpandMutate();
-            Debug.Log("Worker Brain:" + Environment.NewLine + workerAST.root.GetSubtreeString());
-            Debug.Log("Queen Brain:" + Environment.NewLine + queenAST.root.GetSubtreeString());
-        }
 
-        /// <summary>
-        /// Called after every awake has been called.
-        /// </summary>
-        private void Start()
-        {
+            antsAtLocation = new List<AntController>[
+            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+            ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
+            for (int i = 0; i < antsAtLocation.GetLength(0); i++)
+                for (int j = 0; j < antsAtLocation.GetLength(1); j++)
+                    antsAtLocation[i, j] = new List<AntController>();
+
+
+            ants = new List<AntController>();
+
             GenerateData();
             GenerateChunks();
 
             Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
+        }
 
+        public void SetBrains(AST queenBrain, AST workerBrain)
+        {
+            if (antsInitialized) throw new Exception("Can't set brains after ants have been initialized");
+            queenAST = queenBrain;
+            workerAST = workerBrain;
+        }
+
+        private bool antsInitialized = false;
+        public void CreateAndInitializeAnts()
+        {
+            antsInitialized = true;
             GenerateAnts();
-            FixAntPositions();
             UpdateAntLocations();
+            FixAntPositions();
         }
 
-        private float stepTime = 0;
-        public bool run = false;
-        public bool step = false;
-
-        private void Update()
+        public void Step()
         {
-            if (!run && !step)
-            {
-                stepTime = 0;
+            if (ants.Count == 0)
                 return;
-            }
-            stepTime += Time.deltaTime;
-            if (stepTime > 1 || step)//ConfigurationManager.Instance.minTimeDelta)
-            {
-                step = false;
-                stepTime = 0;
-                Step();
-            }
-        }
-
-        private void Step()
-        {
             foreach (IAntNode node in queenAST.nodes.OfType<IAntNode>().ToArray())
                 node.setWorld(this);
             foreach (IAntNode node in workerAST.nodes.OfType<IAntNode>().ToArray())
@@ -222,12 +205,12 @@ namespace Antymology.Terrain
             foreach(AntController ant in ants)
             {
                 int y = 0;
-                while (GetBlock(ant.blockPos.x, y, ant.blockPos.z) is not AirBlock)
+                while (GetBlock(ant.Position.x, y, ant.Position.z) is not AirBlock)
                 {
                     y++;
                 }
-                ant.blockPos.y = y;
-                ant.transform.position = ant.blockPos - new Vector3(0,0.5f,0);
+                ant.Position.y = y;
+                ant.transform.localPosition = ant.Position + new Vector3(0.5f,0,0.5f);
                 if (ant.type == AntController.antType.QUEEN)
                     queenMarker.transform.position = ant.transform.position;
                 //fix rotation
@@ -243,7 +226,7 @@ namespace Antymology.Terrain
                     antsAtLocation[i, j].Clear();
 
             foreach (AntController ant in ants)
-                antsAtLocation[ant.blockPos.x, ant.blockPos.z].Add(ant);
+                antsAtLocation[ant.Position.x, ant.Position.z].Add(ant);
         }
 
         public AntController GetCurrentProcessingAnt()
@@ -277,14 +260,19 @@ namespace Antymology.Terrain
        
         private void GenerateAnts()
         {
-            for(int i = 0; i < 40; i++)
+            GameObject antContainer = new GameObject("Ants");
+            antContainer.transform.parent = transform;
+            antContainer.transform.localPosition = Vector3.zero;
+            for(int i = 0; i < ConfigurationManager.Instance.Number_of_ants; i++)
             {
                 //spawn them roughly in the middle of the map
                 int center = (ConfigurationManager.Instance.Chunk_Diameter * ConfigurationManager.Instance.World_Diameter) / 2;
                 int spawnx = center + UnityEngine.Random.Range(-8, 8);
                 int spawnz = center + UnityEngine.Random.Range(-8, 8);
                 Vector3Int spawnPos = new Vector3Int(spawnx, 0, spawnz);
-                GameObject antObject = Instantiate(antPrefab, spawnPos, Quaternion.identity);
+                GameObject antObject = Instantiate(antPrefab, Vector3.zero, Quaternion.identity);
+                antObject.transform.parent = antContainer.transform;
+                antObject.transform.localPosition = spawnPos;
                 AntController antScript = antObject.GetComponent<AntController>();
                 antScript.MoveToBlockCoord(spawnPos);
                 Vector3Int[] headings = { new Vector3Int(1, 0, 0), new Vector3Int(0, 0, 1), new Vector3Int(-1, 0, 0), new Vector3Int(0, 0, -1) };
@@ -295,7 +283,7 @@ namespace Antymology.Terrain
                     antScript.world = this;
                     if (i == 0)
                     {
-                        antScript.brain = queenAST;
+                        antScript.SetBrain(queenAST);
                         antScript.type = AntController.antType.QUEEN;
                         MeshRenderer render = antObject.GetComponentsInChildren<MeshRenderer>()[0];
                         Material[] materials = render.materials;
@@ -308,11 +296,14 @@ namespace Antymology.Terrain
                     }
                     else
                     {
-                        antScript.brain = workerAST;
+                        antScript.SetBrain(workerAST);
                         antScript.type = AntController.antType.WORKER;
                     }
                 }
             }
+
+            FixAntPositions();
+            UpdateAntLocations();
         }
 
         #endregion
@@ -492,7 +483,7 @@ namespace Antymology.Terrain
                         }
                         else
                         {
-                            Blocks[x, y, z] = new AirBlock();
+                          Blocks[x, y, z] = new AirBlock();
                         }
                         if
                         (
@@ -633,24 +624,28 @@ namespace Antymology.Terrain
         /// </summary>
         private void GenerateChunks()
         {
+            //this game object is purely a container class
             GameObject chunkObg = new GameObject("Chunks");
-
+            chunkObg.transform.parent = transform;
+            chunkObg.transform.localPosition = Vector3.zero;
+            
             for (int x = 0; x < Chunks.GetLength(0); x++)
                 for (int z = 0; z < Chunks.GetLength(2); z++)
                     for (int y = 0; y < Chunks.GetLength(1); y++)
                     {
                         GameObject temp = new GameObject();
                         temp.transform.parent = chunkObg.transform;
-                        temp.transform.position = new Vector3
+                        temp.transform.localPosition = new Vector3
                         (
-                            x * ConfigurationManager.Instance.Chunk_Diameter - 0.5f,
-                            y * ConfigurationManager.Instance.Chunk_Diameter + 0.5f,
-                            z * ConfigurationManager.Instance.Chunk_Diameter - 0.5f
+                            x * ConfigurationManager.Instance.Chunk_Diameter,
+                            y * ConfigurationManager.Instance.Chunk_Diameter,
+                            z * ConfigurationManager.Instance.Chunk_Diameter
                         );
                         Chunk chunkScript = temp.AddComponent<Chunk>();
                         chunkScript.x = x * ConfigurationManager.Instance.Chunk_Diameter;
                         chunkScript.y = y * ConfigurationManager.Instance.Chunk_Diameter;
                         chunkScript.z = z * ConfigurationManager.Instance.Chunk_Diameter;
+                        chunkScript.world = this;
                         chunkScript.Init(blockMaterial);
                         chunkScript.GenerateMesh();
                         Chunks[x, y, z] = chunkScript;

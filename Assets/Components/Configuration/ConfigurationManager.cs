@@ -49,4 +49,26 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// The radius of each acidic region
     /// </summary>
     public int Conatiner_Sphere_Radius = 20;
+
+    //Begin SAM variables
+    /// <summary>
+    /// How many ants will run in each simulation instance
+    /// </summary>
+    [Range(1, 500)]
+    public int Number_of_ants = 10;
+
+    /// <summary>
+    /// How much max health the ants can have
+    /// </summary>
+    public int Max_ant_health = 100;
+
+    /// <summary>
+    /// After each simulation run how many of the top performers will be allowed to mutate and continue
+    /// </summary>
+    public int Selection_pool_size = 2;
+
+    /// <summary>
+    /// After selection how many children will each selected simulation produce for the next round? Parents are automatically included using a + strategy
+    /// </summary>
+    public int Selected_offspring_count = 2;
 }
