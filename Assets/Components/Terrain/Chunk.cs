@@ -319,11 +319,15 @@ namespace Antymology.Terrain
         public void LateUpdate()
         {
             // If we need to update ou mesh, then do so now.
-            if (updateNeeded)
+            if (updateNeeded && !ConfigurationManager.Instance.SimulationOnly)
             {
                 GenerateMesh();
                 updateNeeded = false;
             }
+            if (ConfigurationManager.Instance.SimulationOnly)
+                renderer.enabled = false;
+            else
+                renderer.enabled = true;
         }
 
         #endregion

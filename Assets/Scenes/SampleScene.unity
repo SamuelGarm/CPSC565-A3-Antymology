@@ -396,8 +396,10 @@ MonoBehaviour:
   Conatiner_Sphere_Radius: 20
   Number_of_ants: 10
   Max_ant_health: 15
-  Selection_pool_size: 1
-  Selected_offspring_count: 0
+  Selection_pool_size: 5
+  Selected_offspring_count: 5
+  dt: 0.5
+  SimulationOnly: 0
 --- !u!4 &1051915034
 Transform:
   m_ObjectHideFlags: 0

@@ -79,7 +79,7 @@ public class SimulationManager : MonoBehaviour
                         bestQueenBrain = manager.queenAST;
                     }
                 }
-                Debug.Log("Everyone is dead :(" + Environment.NewLine + "Best world made " + mostNestBlocks + "Nest blocks!");
+                Debug.Log("Everyone is dead :(" + Environment.NewLine + "Best world made " + mostNestBlocks + " Nest blocks!");
                 Debug.Log("Worker brain: " + Environment.NewLine + bestWorkerBrain.root.GetSubtreeString());
                 Debug.Log("Queen brain: " + Environment.NewLine + bestQueenBrain.root.GetSubtreeString());
                 MutateAndReset();

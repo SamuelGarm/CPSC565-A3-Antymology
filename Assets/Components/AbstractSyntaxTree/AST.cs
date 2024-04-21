@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using UnityEditor;
 using System.Collections;
 using UnityEditor.Experimental.GraphView;
+using UnityEditorInternal;
 
 /*
  * Abstract classes for general node implementaiton interfaces
@@ -561,15 +562,17 @@ public class AST
         while (candidates.Count > 0)
         {
             Internal_node candidate = candidates[UnityEngine.Random.Range(0, candidates.Count)];
-            Internal_node parent = (Internal_node)candidate.parent;
-            int indexInParent = parent.Children.IndexOf(candidate);
-            ValueType expectedReturnType = parent.getChildrenTypes()[indexInParent];
-
             if (!candidate.mutatable)
             {
                 candidates.Remove(candidate);
                 continue;
             }
+
+            Internal_node parent = (Internal_node)candidate.parent;
+            int indexInParent = parent.Children.IndexOf(candidate);
+            ValueType expectedReturnType = parent.getChildrenTypes()[indexInParent];
+
+
 
             //choose which of the children will be hoisted. Must be compatable return type with the candidates parent
             List<AST_node> children = new List<AST_node>(candidate.Children);
@@ -628,8 +631,6 @@ public class AST
         {
 
             Internal_node candidate = candidates[UnityEngine.Random.Range(0, candidates.Count)];
-            Internal_node parent = (Internal_node)candidate.parent;
-            int indexInParent = parent.Children.IndexOf(candidate);
 
             if (!candidate.mutatable)
             {
@@ -637,6 +638,10 @@ public class AST
                 continue;
             }
 
+            Internal_node parent = (Internal_node)candidate.parent;
+            int indexInParent = parent.Children.IndexOf(candidate);
+
+            string oldNode = candidate.GetSubtreeString();
             DeleteSubtree(candidate);
 
             //get possible replacements for the node
@@ -651,12 +656,12 @@ public class AST
                 
             int replacementIndex = UnityEngine.Random.Range(0, replacements.Count);
             Leaf_node replacement = (Leaf_node)Activator.CreateInstance(replacements[replacementIndex]);
-
+            nodes.Add(replacement);
             parent.Children[indexInParent] = replacement;
             replacement.parent = parent;
 
             //log the mutation to the AST history
-            string oldNode = candidate.GetSubtreeString();
+            
             string newNode = replacement.GetSubtreeString();
             MutationHistory.Add("SHRINK: " + Environment.NewLine + oldNode + Environment.NewLine + "->" + Environment.NewLine + newNode);
             return true;
@@ -676,14 +681,15 @@ public class AST
         {
             //choose a random candidate node for replacement and store some useful info based on it
             AST_node candidate = candidates[UnityEngine.Random.Range(0, candidates.Count)];
-            Internal_node parent = (Internal_node)candidate.parent;
-            int indexInParent = parent.Children.IndexOf(candidate);
-
             if (!candidate.mutatable)
             {
                 candidates.Remove(candidate);
                 continue;
             }
+            Internal_node parent = (Internal_node)candidate.parent;
+            int indexInParent = parent.Children.IndexOf(candidate);
+
+
 
             //Debug.Log("Attempting to mutate candidate " + Environment.NewLine + candidate.GetSubtreeString());
 
@@ -923,9 +929,11 @@ public class ASTEvaluator
     }
     //store results of calls in a stack. This is used to evaluate nodes with multiple childnode values needed
     private Stack<Node_frame> FrameStack = new Stack<Node_frame>();
+    private AST tree; //used for debugging mainly
 
     public ASTEvaluator(AST tree)
     {
+        this.tree = tree;
         Node_frame frame = new Node_frame();
         frame.node = tree.root;
         frame.currentChild = 0;

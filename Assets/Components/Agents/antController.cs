@@ -410,7 +410,7 @@ public class AntController : MonoBehaviour
     public antType type = antType.WORKER;
 
     ASTEvaluator evaluator = null;
-
+    MeshRenderer renderer;
 
     private void Awake()
     {
@@ -420,6 +420,7 @@ public class AntController : MonoBehaviour
         heading = new Vector3Int(1, 0, 0);
         brain = new AST();
         evaluator = new ASTEvaluator(brain);
+        renderer = GetComponentInChildren<MeshRenderer>();
     }
 
     public void Update()
@@ -437,6 +438,8 @@ public class AntController : MonoBehaviour
                 History += e + Environment.NewLine + Environment.NewLine;
             Debug.Log(History);
         }
+
+        renderer.enabled = !ConfigurationManager.Instance.SimulationOnly;
     }
 
     public void SetBrain(AST brain)
@@ -514,7 +517,7 @@ public class AntController : MonoBehaviour
         }
         else if (action == typeof(DepositPheromone))
         {
-            world.addPheromone(Position.x, Position.z, arguments[0], arguments[1]);
+            world.addPheromone(Position.x, Position.z, (byte)(arguments[0] & 0b00001111), (byte)(arguments[1] & 0b00001111));
         }
         else if (action == typeof(SetValue))
         {
