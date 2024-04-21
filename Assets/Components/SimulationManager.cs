@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using UnityEngine;
 
 public class SimulationManager : MonoBehaviour
@@ -12,10 +13,16 @@ public class SimulationManager : MonoBehaviour
 
     private List<WorldManager> managers = new List<WorldManager>();
     private List<GameObject> worlds = new List<GameObject>();
-
+    private bool readyToRun = false;
+    public int m_AntCount = 0;
     // Start is called before the first frame update
     void Start()
     {
+        int InstnaceDiameter = ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter;
+        int InstnaceHeight = ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter;
+        Camera.main.transform.position = new Vector3(-5, InstnaceHeight + 20, -5);
+        Camera.main.transform.LookAt(new Vector3(InstnaceDiameter * 2, InstnaceHeight - 7, InstnaceDiameter * 2));
+
         GenerateWorlds();
         //after generating the worlds perform expansions of the brains to give some random starting behaviour
         foreach(WorldManager manager in managers)
@@ -25,6 +32,7 @@ public class SimulationManager : MonoBehaviour
                 manager.workerAST.ExpandMutate();
             }
         InitializeWorlds();
+        readyToRun = true;
     }
 
 
@@ -35,22 +43,27 @@ public class SimulationManager : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
+        if(!readyToRun)
+        {
+            return;
+        }
         if (!run && !step)
         {
             stepTime = 0;
             return;
         }
         stepTime += Time.deltaTime;
-        if (stepTime > 0.5 || step)//ConfigurationManager.Instance.minTimeDelta)
+        if (stepTime > ConfigurationManager.Instance.dt || step || ConfigurationManager.Instance.SimulationOnly)//ConfigurationManager.Instance.minTimeDelta)
         {
             step = false;
             stepTime = 0;
             Step();
             int antCount = 0;
-            foreach(WorldManager manager in managers)
+            foreach (WorldManager manager in managers)
             {
                 antCount += manager.ants.Count;
             }
+            m_AntCount = antCount;
             //Debug.Log("Ants in simulation: " + antCount);
             if (antCount == 0)
             {
@@ -76,6 +89,7 @@ public class SimulationManager : MonoBehaviour
 
     void MutateAndReset()
     {
+        readyToRun = false;
         //choose n best worlds
         List<WorldManager> selected = managers.OrderByDescending(t => t.nestBlocks).Take(ConfigurationManager.Instance.Selection_pool_size).ToList();
         List<Tuple<AST, AST>> brains = new List<Tuple<AST, AST>>();
@@ -105,6 +119,7 @@ public class SimulationManager : MonoBehaviour
         }
 
         InitializeWorlds();
+        readyToRun = true;
     }
 
     void Step()

@@ -148,9 +148,6 @@ namespace Antymology.Terrain
 
             GenerateData();
             GenerateChunks();
-
-            Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
-            Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
         }
 
         public void SetBrains(AST queenBrain, AST workerBrain)
@@ -167,16 +164,17 @@ namespace Antymology.Terrain
             GenerateAnts();
             UpdateAntLocations();
             FixAntPositions();
+
+            foreach (IAntNode node in queenAST.nodes.OfType<IAntNode>().ToArray())
+                node.setWorld(this);
+            foreach (IAntNode node in workerAST.nodes.OfType<IAntNode>().ToArray())
+                node.setWorld(this);
         }
 
         public void Step()
         {
             if (ants.Count == 0)
                 return;
-            foreach (IAntNode node in queenAST.nodes.OfType<IAntNode>().ToArray())
-                node.setWorld(this);
-            foreach (IAntNode node in workerAST.nodes.OfType<IAntNode>().ToArray())
-                node.setWorld(this);
 
             EvaporatePheromones();
             UpdateAntLocations();
@@ -373,9 +371,9 @@ namespace Antymology.Terrain
                 WorldXCoordinate < 0 ||
                 WorldYCoordinate < 0 ||
                 WorldZCoordinate < 0 ||
-                WorldXCoordinate > Blocks.GetLength(0) ||
-                WorldYCoordinate > Blocks.GetLength(1) ||
-                WorldZCoordinate > Blocks.GetLength(2)
+                WorldXCoordinate >= Blocks.GetLength(0) ||
+                WorldYCoordinate >= Blocks.GetLength(1) ||
+                WorldZCoordinate >= Blocks.GetLength(2)
             )
             {
                 Debug.Log("Attempted to set a block which didn't exist");
@@ -624,7 +622,7 @@ namespace Antymology.Terrain
         /// <summary>
         /// Takes the world data and generates the associated chunk objects.
         /// </summary>
-        private void GenerateChunks()
+        void GenerateChunks()
         {
             //this game object is purely a container class
             GameObject chunkObg = new GameObject("Chunks");
@@ -649,7 +647,10 @@ namespace Antymology.Terrain
                         chunkScript.z = z * ConfigurationManager.Instance.Chunk_Diameter;
                         chunkScript.world = this;
                         chunkScript.Init(blockMaterial);
-                        chunkScript.GenerateMesh();
+                        if (!ConfigurationManager.Instance.SimulationOnly)
+                            chunkScript.GenerateMesh();
+                        else
+                            chunkScript.updateNeeded = true;
                         Chunks[x, y, z] = chunkScript;
                     }
         }
