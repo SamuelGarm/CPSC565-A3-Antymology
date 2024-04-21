@@ -17,6 +17,13 @@ public class SimulationManager : MonoBehaviour
     void Start()
     {
         GenerateWorlds();
+        //after generating the worlds perform expansions of the brains to give some random starting behaviour
+        foreach(WorldManager manager in managers)
+            for (int a = 0; a < 10; a++)
+            {
+                manager.queenAST.ExpandMutate();
+                manager.workerAST.ExpandMutate();
+            }
         InitializeWorlds();
     }
 
@@ -34,7 +41,7 @@ public class SimulationManager : MonoBehaviour
             return;
         }
         stepTime += Time.deltaTime;
-        if (stepTime > 0.1 || step)//ConfigurationManager.Instance.minTimeDelta)
+        if (stepTime > 0.5 || step)//ConfigurationManager.Instance.minTimeDelta)
         {
             step = false;
             stepTime = 0;
@@ -73,7 +80,7 @@ public class SimulationManager : MonoBehaviour
         List<WorldManager> selected = managers.OrderByDescending(t => t.nestBlocks).Take(ConfigurationManager.Instance.Selection_pool_size).ToList();
         List<Tuple<AST, AST>> brains = new List<Tuple<AST, AST>>();
         foreach (WorldManager manager in selected)
-            brains.Add(new Tuple<AST, AST>(new AST(manager.queenAST), new AST(manager.workerAST)));
+            brains.Add(new Tuple<AST, AST>(manager.queenAST, manager.workerAST)); 
 
         //remove all worlds and recreate them
         foreach (GameObject world in worlds)
@@ -86,12 +93,14 @@ public class SimulationManager : MonoBehaviour
         for (int i = 0; i < ConfigurationManager.Instance.Selection_pool_size; i++)
         {
             //add the original to make this a + strategy
-            managers[i * (ConfigurationManager.Instance.Selected_offspring_count + 1)].SetBrains(brains[i].Item1, brains[i].Item2);
+            managers[i * (ConfigurationManager.Instance.Selected_offspring_count + 1)].SetBrains(new AST(brains[i].Item1), new AST(brains[i].Item2));
             for (int j = 1; j < ConfigurationManager.Instance.Selected_offspring_count + 1; j++)
             {
-                brains[i].Item1.RandomMutation();
-                brains[i].Item2.RandomMutation();
-                managers[i * (ConfigurationManager.Instance.Selected_offspring_count + 1) + j].SetBrains(brains[i].Item1, brains[i].Item2);
+                AST queenBrain = new AST(brains[i].Item1);
+                AST workerBrain = new AST(brains[i].Item2);
+                queenBrain.RandomMutation();
+                workerBrain.RandomMutation();
+                managers[i * (ConfigurationManager.Instance.Selected_offspring_count + 1) + j].SetBrains(queenBrain, workerBrain);
             }
         }
 
@@ -107,12 +116,20 @@ public class SimulationManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Performs any initialization to set up each world
+    /// Generates ants in each world
+    /// </summary>
     void InitializeWorlds()
     {
         foreach(WorldManager manager in managers)
             manager.CreateAndInitializeAnts();
     }
 
+    /// <summary>
+    /// Creates (offspringCount+1) * selectionSize instances of the world. It positions them in the world in a grid
+    /// Each of these worlds has a manager which is added to the 'managers' list
+    /// </summary>
     void GenerateWorlds()
     {
         Vector3Int instanceSize = new Vector3Int(ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
@@ -122,17 +139,13 @@ public class SimulationManager : MonoBehaviour
         {
             for(int j = 0; j < ConfigurationManager.Instance.Selected_offspring_count + 1; j++)
             {
+                //instantiate calls the awake function and initialized class variables immedietly
                 GameObject instance = Instantiate(WorldInstance, new Vector3(0, 0, 0), Quaternion.identity);
                 worlds.Add(instance);
                 instance.name = "Instance " + (i * (ConfigurationManager.Instance.Selected_offspring_count + 1) + j);
                 instance.transform.position = new Vector3(i * (instanceSize.x + 2), 0, j * (instanceSize.z + 2));
                 WorldManager manager = instance.GetComponent<WorldManager>();
                 managers.Add(manager);
-                for (int a = 0; a < 10; a++)
-                {
-                    manager.queenAST.ExpandMutate();
-                    manager.workerAST.ExpandMutate();
-                }
             }
         }
     }

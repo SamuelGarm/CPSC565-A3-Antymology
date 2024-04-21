@@ -112,9 +112,11 @@ namespace Antymology.Terrain
             workerAST.RegisterUserNodeType(typeof(DepositPheromone));
             workerAST.RegisterUserNodeType(typeof(GetValue));
             workerAST.RegisterUserNodeType(typeof(SetValue));
-            workerAST.RegisterUserNodeType(typeof(SensePheromone));
+            workerAST.RegisterUserNodeType(typeof(SensePheromoneAround));
+            workerAST.RegisterUserNodeType(typeof(SensePheromoneHere));
             workerAST.RegisterUserNodeType(typeof(SenseBlockBelow));
             workerAST.RegisterUserNodeType(typeof(SenseBlockAhead));
+            workerAST.RegisterUserNodeType(typeof(QueenHere));
 
             queenAST = new AST();
             queenAST.RegisterUserNodeType(typeof(AntHealth));
@@ -128,7 +130,8 @@ namespace Antymology.Terrain
             queenAST.RegisterUserNodeType(typeof(DepositPheromone));
             queenAST.RegisterUserNodeType(typeof(GetValue));
             queenAST.RegisterUserNodeType(typeof(SetValue));
-            queenAST.RegisterUserNodeType(typeof(SensePheromone));
+            queenAST.RegisterUserNodeType(typeof(SensePheromoneAround));
+            queenAST.RegisterUserNodeType(typeof(SensePheromoneHere));
             queenAST.RegisterUserNodeType(typeof(SenseBlockBelow));
             queenAST.RegisterUserNodeType(typeof(SenseBlockAhead));
             queenAST.RegisterUserNodeType(typeof(CreateNest)); //Unique to queen
@@ -174,6 +177,7 @@ namespace Antymology.Terrain
                 node.setWorld(this);
             foreach (IAntNode node in workerAST.nodes.OfType<IAntNode>().ToArray())
                 node.setWorld(this);
+
             EvaporatePheromones();
             UpdateAntLocations();
             for(int i = ants.Count-1; i>= 0; i--)
@@ -277,29 +281,27 @@ namespace Antymology.Terrain
                 antScript.MoveToBlockCoord(spawnPos);
                 Vector3Int[] headings = { new Vector3Int(1, 0, 0), new Vector3Int(0, 0, 1), new Vector3Int(-1, 0, 0), new Vector3Int(0, 0, -1) };
                 antScript.heading = headings[UnityEngine.Random.Range(0, 4)];
-                if(antScript != null)
+
+                ants.Add(antScript);
+                antScript.world = this;
+                if (i == 0)
                 {
-                    ants.Add(antScript);
-                    antScript.world = this;
-                    if (i == 0)
-                    {
-                        antScript.SetBrain(queenAST);
-                        antScript.type = AntController.antType.QUEEN;
-                        MeshRenderer render = antObject.GetComponentsInChildren<MeshRenderer>()[0];
-                        Material[] materials = render.materials;
-                        materials[0] = queenMaterial;
-                        materials[1] = queenMaterial;
-                        materials[2] = queenMaterial;
-                        materials[3] = queenMaterial;
-                        render.materials = materials;
-                        queenMarker.transform.position = antObject.transform.position;
-                    }
-                    else
-                    {
-                        antScript.SetBrain(workerAST);
-                        antScript.type = AntController.antType.WORKER;
-                    }
+                    antScript.SetBrain(queenAST);
+                    antScript.type = AntController.antType.QUEEN;
+                    MeshRenderer render = antObject.GetComponentsInChildren<MeshRenderer>()[0];
+                    Material[] materials = render.materials;
+                    materials[0] = queenMaterial;
+                    materials[1] = queenMaterial;
+                    materials[2] = queenMaterial;
+                    materials[3] = queenMaterial;
+                    render.materials = materials;
                 }
+                else
+                {
+                    antScript.SetBrain(workerAST);
+                    antScript.type = AntController.antType.WORKER;
+                }
+                
             }
 
             FixAntPositions();

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using static System.Collections.Specialized.BitVector32;
 using UnityEngine.UIElements.Experimental;
+using System.Linq;
 
 interface IAntNode
 {
@@ -205,7 +206,7 @@ public class SetValue : Internal_node, IAction, IAntNode
 /*
  * Sensors
  */
-public class SensePheromone : Internal_node, IByteReturn, IAntNode
+public class SensePheromoneAround : Internal_node, IByteReturn, IAntNode
 {
     WorldManager controller;
     public void setWorld(WorldManager antController)
@@ -248,6 +249,31 @@ public class SensePheromone : Internal_node, IByteReturn, IAntNode
     public override List<ValueType> getChildrenTypes()
     {
         return new List<ValueType>() { ValueType.HBYTE, ValueType.HBYTE };
+    }
+}
+
+public class SensePheromoneHere : Internal_node, IByteReturn, IAntNode
+{
+    WorldManager controller;
+    public void setWorld(WorldManager antController)
+    {
+        controller = antController;
+    }
+
+    public byte Evaluate(List<byte> parameters)
+    {
+        AntController ant = controller.GetCurrentProcessingAnt();
+        return (byte)Math.Min(controller.pheromoneAtBlock(ant.Position.x, ant.Position.z, (byte)(parameters[0] & 0b00001111)), byte.MaxValue);
+    }
+
+    public override string GetSubtreeString()
+    {
+        return "SENSE_PHEROMONE_HERE";
+    }
+
+    public override List<ValueType> getChildrenTypes()
+    {
+        return new List<ValueType>() { ValueType.HBYTE };
     }
 }
 
@@ -318,6 +344,32 @@ public class SenseBlockAhead : Leaf_node, IHByteReturn, IAntNode
     }
 }
 
+public class QueenHere : Leaf_node, IBoolReturn, IAntNode
+{
+    WorldManager controller;
+    public byte Evaluate(List<byte> parameters)
+    {
+        AntController ant = controller.GetCurrentProcessingAnt();
+        List<AntController> ants = controller.antsAtBlock(ant.Position.x, ant.Position.y, ant.Position.z);
+        foreach(AntController e in ants)
+        {
+            if (e.type == AntController.antType.QUEEN)
+                return 1;
+        }
+        return 0;
+    }
+
+    public override string GetSubtreeString()
+    {
+        return "QUEEN_HERE";
+    }
+
+    public void setWorld(WorldManager controller)
+    {
+        this.controller = controller;
+    }
+}
+
 /*
  * Queen specific functions
  */
@@ -340,7 +392,7 @@ public class CreateNest : Leaf_node, IAntNode, IAction
  */
 public class AntController : MonoBehaviour
 {
-    public AST brain = new AST();
+    public AST brain;
     public WorldManager world;
 
     public byte[] values = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -349,6 +401,7 @@ public class AntController : MonoBehaviour
     int healthDec = -1;
 
     public bool printBrain = false;
+    public bool printMutationHistory = false;
 
     public Vector3Int heading;
     public Vector3Int Position = Vector3Int.zero;
@@ -359,14 +412,14 @@ public class AntController : MonoBehaviour
     ASTEvaluator evaluator = null;
 
 
-    private void Start()
+    private void Awake()
     {
         maxHealth = ConfigurationManager.Instance.Max_ant_health;
         currentHealth = maxHealth;
         Position = Vector3Int.FloorToInt(transform.localPosition);
         heading = new Vector3Int(1, 0, 0);
-        if(evaluator == null)
-            evaluator = new ASTEvaluator(brain);
+        brain = new AST();
+        evaluator = new ASTEvaluator(brain);
     }
 
     public void Update()
@@ -375,6 +428,14 @@ public class AntController : MonoBehaviour
         {
             printBrain = false;
             Debug.Log(brain.root.GetSubtreeString());
+        }
+        if (printMutationHistory)
+        {
+            printMutationHistory = false;
+            string History = "";
+            foreach (string e in brain.MutationHistory)
+                History += e + Environment.NewLine + Environment.NewLine;
+            Debug.Log(History);
         }
     }
 
@@ -406,8 +467,6 @@ public class AntController : MonoBehaviour
             return;
         Type action = frame.Item1;
         byte[] arguments = frame.Item2;
-
-        //Debug.Log(action.ToString());
 
         if (action == typeof(MoveForward))
         {

@@ -36,10 +36,10 @@ public interface IAction { }
 //specified a class contains a value like a number or boolean. This is useful for mutations where we might want to change the number but leave it a constant
 public interface IValue : IReturnable { public void SetValue(byte value); }
 
-
 // Base class for AST nodes
 public abstract class AST_node
 {
+    public bool mutatable = true;//if you want a node to not be mutated set this to false in the obejct
     public AST_node parent;
     //prevent this class being made outside this file
     //the constructor will automatically create children to ensure valid state
@@ -441,6 +441,8 @@ public class AST
         }
     }
 
+    public List<string> MutationHistory;
+
     private void RegisterNodes()
     {
         //these nodes are always part of program structure
@@ -458,26 +460,35 @@ public class AST
 
     public AST(AST other)
     {
+        MutationHistory = new List<string>(other.MutationHistory);
         foreach (Type nodeT in other.nodeTypes)
             RegisterUserNodeType(nodeT);
 
         //we need to copy the tree structure while making new nodes and setting child/parent relations to be correct...
         Stack<NodeMirror> toProcess = new Stack<NodeMirror>();
         root = new SequenceNode();
+        root.mutatable = other.root.mutatable;
         toProcess.Push(new NodeMirror(other.root, root));
+        nodes.Add(root);
         
+        //this loop iterates over every node and copys them
         while(toProcess.Count > 0)
         {
+            //processing will contain created and initialized instances of the nodes in it
+            //we need to create and initialize children of the node and add them to the stack 
             NodeMirror processing = toProcess.Pop();
+
             if(processing.original is Internal_node iNode)
             {
-                foreach(AST_node child in iNode.Children)
+                //create copys of all the children
+                foreach(AST_node origChild in iNode.Children)
                 {
-                    AST_node copy = (AST_node)Activator.CreateInstance(child.GetType());
-                    copy.parent = processing.copy;
-                    ((Internal_node)processing.copy).Children.Add(copy);
-                    toProcess.Push(new NodeMirror(child, copy));
-                    nodes.Add(copy);
+                    AST_node copyChild = (AST_node)Activator.CreateInstance(origChild.GetType());
+                    copyChild.parent = processing.copy;
+                    copyChild.mutatable = origChild.mutatable;
+                    ((Internal_node)processing.copy).Children.Add(copyChild);
+                    toProcess.Push(new NodeMirror(origChild, copyChild));
+                    nodes.Add(copyChild);
                 }
             }
             if(processing.original is IValue vNode)
@@ -493,9 +504,24 @@ public class AST
 
         //create barebones structure
         root = new SequenceNode(); //a squence node is ALWAYS the root
+        root.Children.Add(new NOOP()); //the noop prevents infinite loops
         root.Children.Add(new SequenceNode());
-        root.Children[0].parent = root;
-        nodes.Add(root.Children[0]); //root isn't added since there must always be a loopable sequence node encasing everything
+        root.Children[0].mutatable = false;
+        root.mutatable = false;
+
+        //TESTING
+        //Internal_node pheromoneNode = new SensePheromoneHere();
+        //root.Children.Add(pheromoneNode);
+        //Constant_hbyte hnode = new Constant_hbyte();
+        //pheromoneNode.Children.Add(hnode);
+        //hnode.parent = pheromoneNode;
+        
+        foreach (AST_node child in root.Children)
+            child.parent = root;
+
+        nodes.Add(root);
+        nodes.AddRange(root.Children);
+        MutationHistory = new List<string>();
     }
 
     public void RegisterUserNodeType(Type type) 
@@ -506,14 +532,14 @@ public class AST
 
     public bool RandomMutation()
     {
-        List<int> choices = new List<int>(){ 0, 1, 2, 3 };
+        List<int> choices = new List<int>(){ 1,2,3,4 }; //TODO, add in other mutations
         while(choices.Count > 0)
         {
             int choice = choices[UnityEngine.Random.Range(0, choices.Count)];
             bool result = false;
             switch (choice)
             {
-                //case 0: result = HoistMutate(); break;
+                case 0: result = HoistMutate(); break;
                 case 1: result = ShrinkMutate(); break;
                 case 2: result = ExpandMutate(); break;
                 case 3: result = PointMutate(); break;
@@ -538,6 +564,12 @@ public class AST
             Internal_node parent = (Internal_node)candidate.parent;
             int indexInParent = parent.Children.IndexOf(candidate);
             ValueType expectedReturnType = parent.getChildrenTypes()[indexInParent];
+
+            if (!candidate.mutatable)
+            {
+                candidates.Remove(candidate);
+                continue;
+            }
 
             //choose which of the children will be hoisted. Must be compatable return type with the candidates parent
             List<AST_node> children = new List<AST_node>(candidate.Children);
@@ -574,6 +606,11 @@ public class AST
             parent.Children[indexInParent] = hoistChild;
             hoistChild.parent = parent;
 
+            //log the mutation to the AST history
+            string oldNode = candidate.GetSubtreeString();
+            string newNode = hoistChild.GetSubtreeString();
+            MutationHistory.Add("HOIST: " + Environment.NewLine + oldNode + Environment.NewLine + "->" + Environment.NewLine + newNode);
+
             return true;
         }
         return false;
@@ -587,25 +624,44 @@ public class AST
         if (candidates.Count == 0)
             return false;
 
-        Internal_node candidate = candidates[UnityEngine.Random.Range(0, candidates.Count)];
-        Internal_node parent = (Internal_node)candidate.parent;
-        int indexInParent = parent.Children.IndexOf(candidate);
+        while (candidates.Count > 0)
+        {
 
-        DeleteSubtree(candidate);
+            Internal_node candidate = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            Internal_node parent = (Internal_node)candidate.parent;
+            int indexInParent = parent.Children.IndexOf(candidate);
 
-        //get possible replacements for the node
-        ValueType expectedReturnType = parent.getChildrenTypes()[indexInParent];
-        List<Type> replacements = NodesWithReturnType(expectedReturnType);
-        replacements.RemoveAll(item => item.IsSubclassOf(typeof(Internal_node)));
-        if (replacements.Count == 0)
-            return false; 
-        int replacementIndex = UnityEngine.Random.Range(0, replacements.Count);
-        Leaf_node replacement = (Leaf_node)Activator.CreateInstance(replacements[replacementIndex]);
+            if (!candidate.mutatable)
+            {
+                candidates.Remove(candidate);
+                continue;
+            }
 
-        parent.Children[indexInParent] = replacement;
-        replacement.parent = parent;
+            DeleteSubtree(candidate);
 
-        return true;
+            //get possible replacements for the node
+            ValueType expectedReturnType = parent.getChildrenTypes()[indexInParent];
+            List<Type> replacements = NodesWithReturnType(expectedReturnType);
+            replacements.RemoveAll(item => item.IsSubclassOf(typeof(Internal_node)));
+            if (replacements.Count == 0)
+            {
+                candidates.Remove(candidate);
+                continue;
+            }
+                
+            int replacementIndex = UnityEngine.Random.Range(0, replacements.Count);
+            Leaf_node replacement = (Leaf_node)Activator.CreateInstance(replacements[replacementIndex]);
+
+            parent.Children[indexInParent] = replacement;
+            replacement.parent = parent;
+
+            //log the mutation to the AST history
+            string oldNode = candidate.GetSubtreeString();
+            string newNode = replacement.GetSubtreeString();
+            MutationHistory.Add("SHRINK: " + Environment.NewLine + oldNode + Environment.NewLine + "->" + Environment.NewLine + newNode);
+            return true;
+        }
+        return false;
     }
 
     //invalidates evaluators!
@@ -623,6 +679,12 @@ public class AST
             Internal_node parent = (Internal_node)candidate.parent;
             int indexInParent = parent.Children.IndexOf(candidate);
 
+            if (!candidate.mutatable)
+            {
+                candidates.Remove(candidate);
+                continue;
+            }
+
             //Debug.Log("Attempting to mutate candidate " + Environment.NewLine + candidate.GetSubtreeString());
 
             //get all possible replacements that would be compatible with the parents return type expectation
@@ -636,8 +698,8 @@ public class AST
             else if (candidate is Internal_node inNode)
                 replacements.RemoveAll(item => item.IsSubclassOf(typeof(Leaf_node)));
 
-            //PRevents pointless mutations like DIG->DIG but still allows value types to mutate (ex: 14->6)
-            if (!typeof(IValue).IsAssignableFrom(candidate.GetType()))
+            //Prevents pointless mutations like DIG->DIG but still allows value types to mutate (ex: 14->6)
+            if (candidate is not IValue)
                 replacements.Remove(candidate.GetType());
 
             //test the replacements
@@ -685,6 +747,12 @@ public class AST
                         inReplace.Children[i] = inCandidate.Children[i];
                     }
                     //Debug.Log("Replaced with " + Environment.NewLine + inReplace.GetSubtreeString());
+
+                    //log the mutation to the AST history
+                    string oldNode = candidate.GetSubtreeString();
+                    string newNode = replacement.GetSubtreeString();
+                    MutationHistory.Add("REPLACE: " + Environment.NewLine + oldNode + Environment.NewLine + "->" + Environment.NewLine + newNode);
+
                     return true;
                 }
                 else if (replacement is Leaf_node lReplace)
@@ -722,6 +790,11 @@ public class AST
         {
             //find all possible replacements for a random candidate
             AST_node candidate = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            if (!candidate.mutatable)
+            {
+                candidates.Remove(candidate);
+                continue;
+            }
             Internal_node parent = (Internal_node)candidate.parent;
             
             //use the parent child parameters to determine what nodes are good
@@ -754,6 +827,11 @@ public class AST
                 nodes.Add(replacement);
                 if (candidate is not SequenceNode)
                     nodes.AddRange(((Internal_node)replacement).Children);
+
+                //log the mutation to the AST history
+                string oldNode = candidate.GetSubtreeString();
+                string newNode = replacement.GetSubtreeString();
+                MutationHistory.Add("EXPAND: " + Environment.NewLine + oldNode + Environment.NewLine + "->" + Environment.NewLine + newNode);
 
                 if (candidate is SequenceNode seq)
                 {
@@ -852,8 +930,10 @@ public class ASTEvaluator
         frame.node = tree.root;
         frame.currentChild = 0;
         //if there are no actionable nodes then the evalutator would never return so we just prevent any evaluation from happening
-        if (tree.nodes.OfType<IAction>().Count() > 0)
+        //the root must be a sequence node and the first child must be a NOOP instruction to ensure no infinite logic loops can occur
+        if (tree.nodes.OfType<IAction>().Count() > 0 && tree.root is SequenceNode sNode && sNode.Children.Count > 0 && sNode.Children[0] is NOOP)
             FrameStack.Push(frame);
+        
     }
 
     //iterate through the tree evaluating as much as possible until a action_node that can be evaulated (all child subtrees have been processed) is reached and the node type is returned
