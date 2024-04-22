@@ -72,8 +72,6 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// </summary>
     public int Selected_offspring_count = 2;
 
-    public float dt = 0.5f;
-
     /// <summary>
     ///Disables all graphical things such as chunk remeshing. Massively increases simulation speed!!
     /// </summary>

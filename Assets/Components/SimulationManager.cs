@@ -14,10 +14,21 @@ public class SimulationManager : MonoBehaviour
     private List<WorldManager> managers = new List<WorldManager>();
     private List<GameObject> worlds = new List<GameObject>();
     private bool readyToRun = false;
-    public int m_AntCount = 0;
+
+    public float dt = 0.5f;
+    public bool run = false;
+    public bool step = false;
+
+    //display variables
+    public int disp_TotalAntCount = 0;
+    public int[] disp_WorldAntCounts;
+    public int[] disp_WorldNestCounts;
+
     // Start is called before the first frame update
     void Start()
     {
+        disp_WorldAntCounts = new int[ConfigurationManager.Instance.Selection_pool_size * (ConfigurationManager.Instance.Selected_offspring_count + 1)];
+        disp_WorldNestCounts = new int[ConfigurationManager.Instance.Selection_pool_size * (ConfigurationManager.Instance.Selected_offspring_count + 1)];
         int InstnaceDiameter = ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter;
         int InstnaceHeight = ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter;
         Camera.main.transform.position = new Vector3(-5, InstnaceHeight + 20, -5);
@@ -37,8 +48,7 @@ public class SimulationManager : MonoBehaviour
 
 
     private float stepTime = 0;
-    public bool run = false;
-    public bool step = false;
+    
 
     // Update is called once per frame
     private void Update()
@@ -53,18 +63,22 @@ public class SimulationManager : MonoBehaviour
             return;
         }
         stepTime += Time.deltaTime;
-        if (stepTime > ConfigurationManager.Instance.dt || step || ConfigurationManager.Instance.SimulationOnly)//ConfigurationManager.Instance.minTimeDelta)
+        if (stepTime > dt || step || ConfigurationManager.Instance.SimulationOnly)//ConfigurationManager.Instance.minTimeDelta)
         {
             step = false;
             stepTime = 0;
             Step();
             int antCount = 0;
+            int i = 0;
             foreach (WorldManager manager in managers)
             {
+                disp_WorldAntCounts[i] = manager.ants.Count;
+                disp_WorldNestCounts[i] = manager.nestBlocks;
                 antCount += manager.ants.Count;
+                i++;
             }
-            m_AntCount = antCount;
-            //Debug.Log("Ants in simulation: " + antCount);
+            disp_TotalAntCount = antCount;
+            
             if (antCount == 0)
             {
                 int mostNestBlocks = 0;
