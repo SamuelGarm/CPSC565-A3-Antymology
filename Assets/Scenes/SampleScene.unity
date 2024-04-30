@@ -371,8 +371,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   WorldInstance: {fileID: 3204513270893395041, guid: bbb67fe87868769448c5ca47411c9e54,
     type: 3}
+  dt: 0.5
   run: 0
   step: 0
+  disp_TotalAntCount: 0
+  disp_WorldAntCounts: 
+  disp_WorldNestCounts: 
 --- !u!114 &1051915033
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -396,9 +400,8 @@ MonoBehaviour:
   Conatiner_Sphere_Radius: 20
   Number_of_ants: 10
   Max_ant_health: 15
-  Selection_pool_size: 5
-  Selected_offspring_count: 5
-  dt: 0.5
+  Selection_pool_size: 3
+  Selected_offspring_count: 3
   SimulationOnly: 0
 --- !u!4 &1051915034
 Transform:

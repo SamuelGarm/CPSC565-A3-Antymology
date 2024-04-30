@@ -288,10 +288,13 @@ namespace Antymology.Terrain
                     antScript.type = AntController.antType.QUEEN;
                     MeshRenderer render = antObject.GetComponentsInChildren<MeshRenderer>()[0];
                     Material[] materials = render.materials;
-                    materials[0] = queenMaterial;
-                    materials[1] = queenMaterial;
-                    materials[2] = queenMaterial;
-                    materials[3] = queenMaterial;
+                    for (int mat = 0; mat < render.materials.Count(); mat++)
+                        materials[mat] = queenMaterial;
+                    
+                    //materials[0] = queenMaterial;
+                    //materials[1] = queenMaterial;
+                    //materials[2] = queenMaterial;
+                    //materials[3] = queenMaterial;
                     render.materials = materials;
                 }
                 else
